@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { resolveStatePath } from "./utils.js";
 import type { PipelineTracking } from "./pipeline.js";
 
@@ -36,6 +37,7 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
 /** Write ralplan state to file */
 export function writeRalplanStateFile(directory: string, state: RalplanState): void {
   const path = resolveStatePath(directory);
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(state, null, 2), "utf-8");
 }
 

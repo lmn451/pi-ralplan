@@ -1,10 +1,14 @@
 {
   "name": "pi-ralplan",
   "version": "0.1.0",
-  "description": "Consensus-driven planning extension for Pi — Planner/Architect/Critic pipeline",
+  "description": "Consensus-driven planning extension for Pi",
   "keywords": ["pi-package", "ralplan", "planning", "consensus"],
+  "type": "module",
   "pi": {
     "extensions": ["./pi/extensions/ralplan"],
     "skills": ["./pi/skills/ralplan"]
+  },
+  "scripts": {
+    "test": "bun test"
   }
 }
