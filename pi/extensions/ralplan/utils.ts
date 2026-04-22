@@ -18,6 +18,11 @@ export function resolveStatePath(directory: string): string {
   return join(directory, ".pi", "ralplan", "state.json");
 }
 
+/** Resolve the open questions file path */
+export function resolveOpenQuestionsPath(directory: string): string {
+  return join(directory, ".pi", "ralplan", "plans", "open-questions.md");
+}
+
 /** Escape special characters for embedding in prompts */
 export function escapeForPrompt(text: string): string {
   return text

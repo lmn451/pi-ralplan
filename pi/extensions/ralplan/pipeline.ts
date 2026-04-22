@@ -38,6 +38,7 @@ export interface PipelineContext {
   sessionId?: string;
   specPath?: string;
   planPath?: string;
+  openQuestionsPath?: string;
   config: PipelineConfig;
 }
 
@@ -89,13 +90,16 @@ export function getActiveAdapters(config: PipelineConfig): PipelineStageAdapter[
 // ============================================================================
 
 export function resolvePipelineConfig(userConfig?: Partial<PipelineConfig>): PipelineConfig {
-  return {
-    ...DEFAULT_PIPELINE_CONFIG,
-    ...userConfig,
-    verification: userConfig?.verification === false
-      ? false
-      : { ...DEFAULT_PIPELINE_CONFIG.verification, ...(userConfig?.verification as VerificationConfig | undefined) },
-  };
+  const config = { ...DEFAULT_PIPELINE_CONFIG };
+
+  if (userConfig) {
+    if (userConfig.planning !== undefined) config.planning = userConfig.planning;
+    if (userConfig.execution !== undefined) config.execution = userConfig.execution;
+    if (userConfig.verification !== undefined) config.verification = userConfig.verification;
+    if (userConfig.qa !== undefined) config.qa = userConfig.qa;
+  }
+
+  return config;
 }
 
 // ============================================================================
@@ -310,7 +314,8 @@ function escapeForPrompt(text: string): string {
     .replace(/\$/g, "\\$");
 }
 
-function getExpansionPrompt(idea: string): string {
+function getExpansionPrompt(idea: string, openQuestionsPath?: string): string {
+  const oqPath = openQuestionsPath || ".pi/ralplan/plans/open-questions.md";
   return `## IDEA EXPANSION
 
 Your task: Expand this product idea into detailed requirements and technical spec.
@@ -357,6 +362,17 @@ Based on the requirements analysis above, create:
 Output as structured markdown."
 )
 \`\`\`
+
+### Step 2.5: Persist Open Questions
+
+If the Analyst output includes a \`### Open Questions\` section, extract those items and save them to \`${oqPath}\` using the standard format:
+
+\`\`\`
+## [Topic] - [Date]
+- [ ] [Question] — [Why it matters]
+\`\`\`
+
+The Analyst is read-only and cannot write files, so you must persist its open questions on its behalf.
 
 ### Step 3: Save Combined Spec
 
@@ -653,7 +669,7 @@ Your task: Expand the idea into a detailed spec and implementation plan using co
 
 ### Part 1: Idea Expansion (Spec Creation)
 
-${getExpansionPrompt(context.idea)}
+${getExpansionPrompt(context.idea, context.openQuestionsPath)}
 
 ### Part 2: Consensus Planning
 

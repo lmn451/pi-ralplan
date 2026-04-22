@@ -7,7 +7,8 @@ export const RALPH_COMPLETION_SIGNAL = "PIPELINE_RALPH_COMPLETE";
 export const QA_COMPLETION_SIGNAL = "PIPELINE_QA_COMPLETE";
 
 /** Generate the expansion phase prompt (Phase 0) */
-export function getExpansionPrompt(idea: string): string {
+export function getExpansionPrompt(idea: string, openQuestionsPath?: string): string {
+  const oqPath = openQuestionsPath || ".pi/ralplan/plans/open-questions.md";
   return `## IDEA EXPANSION
 
 Your task: Expand this product idea into detailed requirements and technical spec.
@@ -54,6 +55,19 @@ Based on the requirements analysis above, create:
 Output as structured markdown."
 )
 \`\`\`
+
+### Step 2.5: Persist Open Questions
+
+If the Analyst output includes a \`### Open Questions\` section, extract those items and save them to \`.pi/ralplan/plans/open-questions.md\` using the standard format:
+
+\`\`\`
+## [Topic] - [Date]
+- [ ] [Question] — [Why it matters]
+\`\`\`
+
+The Analyst is read-only and cannot write files, so you must persist its open questions on its behalf.
+
+Save to: \`${oqPath}\`
 
 ### Step 3: Save Combined Spec
 
@@ -355,7 +369,7 @@ Your task: Expand the idea into a detailed spec and implementation plan using co
 
 ### Part 1: Idea Expansion (Spec Creation)
 
-${getExpansionPrompt(context.idea)}
+${getExpansionPrompt(context.idea, context.openQuestionsPath)}
 
 ### Part 2: Consensus Planning
 

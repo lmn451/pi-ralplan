@@ -82,6 +82,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       sessionId: state.sessionId,
       specPath: state.specPath,
       planPath: state.planPath,
+      openQuestionsPath: ".pi/ralplan/plans/open-questions.md",
       config: state.pipeline.pipelineConfig,
     };
   }
