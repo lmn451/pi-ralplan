@@ -147,12 +147,21 @@ export function getNextStageAdapter(tracking: PipelineTracking): PipelineStageAd
   return null;
 }
 
-export function advanceStage(tracking: PipelineTracking): {
+export function advanceStage(
+  tracking: PipelineTracking,
+  context?: PipelineContext,
+): {
   adapter: PipelineStageAdapter | null;
   phase: PipelinePhase;
   tracking: PipelineTracking;
 } {
   const { stages, currentStageIndex } = tracking;
+
+  // Call onExit for current stage
+  if (context && currentStageIndex >= 0 && currentStageIndex < stages.length) {
+    const currentAdapter = getAdapterById(stages[currentStageIndex].id);
+    currentAdapter?.onExit?.(context);
+  }
 
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
     stages[currentStageIndex].status = "complete";
@@ -176,7 +185,18 @@ export function advanceStage(tracking: PipelineTracking): {
   stages[nextIndex].status = "active";
   stages[nextIndex].startedAt = nowISO();
 
-  const nextAdapter = getAdapterById(stages[nextIndex].id)!;
+  const nextAdapter = getAdapterById(stages[nextIndex].id);
+  if (!nextAdapter) {
+    stages[nextIndex].status = "failed";
+    stages[nextIndex].error = `No adapter registered for stage "${stages[nextIndex].id}"`;
+    return { adapter: null, phase: "failed", tracking };
+  }
+
+  // Call onEnter for next stage
+  if (context) {
+    nextAdapter.onEnter?.(context);
+  }
+
   return { adapter: nextAdapter, phase: stages[nextIndex].id, tracking };
 }
 

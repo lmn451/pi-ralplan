@@ -60,6 +60,12 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   // In-memory state (reconstructed from session entries)
   let state: RalplanState | null = null;
 
+  // Signal deduplication: track the last entry ID we advanced from
+  let lastAdvancedEntryId: string | null = null;
+
+  // Track whether we auto-started from --ralplan flag (only once)
+  let autoStartedFromFlag = false;
+
   // ==========================================================================
   // HELPERS
   // ==========================================================================
@@ -161,6 +167,12 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   // COMMANDS
   // ==========================================================================
 
+  pi.registerFlag("ralplan", {
+    description: "Start a RALPLAN consensus planning session with the initial prompt",
+    type: "boolean",
+    default: false,
+  });
+
   pi.registerCommand("ralplan", {
     description: "Start consensus planning for an idea",
     handler: async (args, ctx) => {
@@ -257,13 +269,20 @@ ${prompt}`,
         stages[currentStageIndex].status = "skipped";
       }
 
-      const result = advanceStage(state.pipeline);
+      const pipelineCtx = buildContext();
+      const result = advanceStage(state.pipeline, pipelineCtx ?? undefined);
       state.pipeline = result.tracking;
       persistState();
       updateUI(ctx);
 
       if (result.phase === "complete") {
         ctx.ui.notify("RALPLAN pipeline complete!", "success");
+        deactivateState();
+        return;
+      }
+
+      if (result.phase === "failed") {
+        ctx.ui.notify(`RALPLAN stage failed: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`, "error");
         deactivateState();
         return;
       }
@@ -327,7 +346,8 @@ ${prompt}`,
       }
 
       const currentId = state.pipeline.stages[state.pipeline.currentStageIndex]?.id;
-      const result = advanceStage(state.pipeline);
+      const pipelineCtx = buildContext();
+      const result = advanceStage(state.pipeline, pipelineCtx ?? undefined);
       state.pipeline = result.tracking;
       persistState();
       updateUI(ctx);
@@ -337,6 +357,15 @@ ${prompt}`,
         return {
           content: [{ type: "text", text: "RALPLAN pipeline complete! All stages finished." }],
           details: { phase: "complete" },
+        };
+      }
+
+      if (result.phase === "failed") {
+        deactivateState();
+        return {
+          content: [{ type: "text", text: `RALPLAN stage failed: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}` }],
+          details: { phase: "failed" },
+          isError: true,
         };
       }
 
@@ -444,10 +473,10 @@ ${prompt}`,
     const text = event.text.trim();
 
     // Ralplan-first gate: if user makes a broad request and no active session,
-    // suggest ralplan first
-    if (!isActive() && looksLikeBroadRequest(text)) {
+    // suggest ralplan first. Skip if explicitly bypassed.
+    if (!isActive() && looksLikeBroadRequest(text) && !hasBypassPrefix(text)) {
       ctx.ui.notify(
-        "This looks like a complex request. Consider using /ralplan for consensus planning first.",
+        "This looks like a broad request. Consider using /ralplan for consensus planning first, or prefix with 'force:' to bypass.",
         "info",
       );
     }
@@ -456,7 +485,30 @@ ${prompt}`,
   });
 
   // Inject stage prompt before agent starts
-  pi.on("before_agent_start", async (_event, ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
+    // Auto-start from --ralplan flag on first prompt
+    if (!isActive() && pi.getFlag("ralplan") === true && !autoStartedFromFlag) {
+      autoStartedFromFlag = true;
+      const idea = event.prompt.trim() || "Implement the requested feature";
+
+      const config = resolvePipelineConfig();
+      const tracking = buildPipelineTracking(config);
+      if (
+        tracking.currentStageIndex >= 0 &&
+        tracking.currentStageIndex < tracking.stages.length
+      ) {
+        tracking.stages[tracking.currentStageIndex].status = "active";
+        tracking.stages[tracking.currentStageIndex].startedAt =
+          new Date().toISOString();
+      }
+
+      state = buildDefaultState(idea, tracking, undefined);
+      persistState();
+      updateUI(ctx);
+      ctx.ui.notify(`RALPLAN started (via --ralplan): ${idea}`, "info");
+      // Continue to inject the stage prompt below
+    }
+
     if (!isActive() || !state) return;
 
     const adapter = getCurrentStageAdapter(state.pipeline);
@@ -485,12 +537,22 @@ ${prompt}`,
     const currentStage = state.pipeline.stages[state.pipeline.currentStageIndex];
     if (!currentStage) return;
 
+    // Deduplication: get the last entry ID to avoid re-advancing on the same turn
+    const branch = ctx.sessionManager.getBranch();
+    const lastEntry = branch[branch.length - 1];
+    const currentEntryId = lastEntry?.id ?? null;
+    if (currentEntryId && currentEntryId === lastAdvancedEntryId) {
+      return;
+    }
+
     const lastText = getLastAssistantText(event.messages);
     if (!lastText) return;
 
     if (detectSignal(lastText, currentStage.id)) {
+      lastAdvancedEntryId = currentEntryId;
       const currentId = currentStage.id;
-      const result = advanceStage(state.pipeline);
+      const pipelineCtx = buildContext();
+      const result = advanceStage(state.pipeline, pipelineCtx ?? undefined);
       state.pipeline = result.tracking;
       persistState();
       updateUI(ctx);
@@ -502,6 +564,22 @@ ${prompt}`,
             content: `## RALPLAN Pipeline Complete! ✓
 
 All stages finished successfully.`,
+            display: true,
+          },
+          { triggerTurn: false },
+        );
+        deactivateState();
+        updateUI(ctx);
+        return;
+      }
+
+      if (result.phase === "failed") {
+        pi.sendMessage(
+          {
+            customType: "ralplan-failed",
+            content: `## RALPLAN Pipeline Failed
+
+Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
             display: true,
           },
           { triggerTurn: false },
@@ -546,19 +624,59 @@ All stages finished successfully.`,
 // HEURISTICS
 // ============================================================================
 
+// Concrete anchors that indicate a well-specified request (passes the gate)
+const CONCRETE_ANCHORS = [
+  /[a-zA-Z0-9_\-./]+\.[a-zA-Z]{2,}/, // file paths with extensions
+  /#[0-9]+/, // issue/PR numbers
+  /[a-z]+[A-Z][a-zA-Z]+/, // camelCase symbols
+  /[A-Z][a-z]+[A-Z][a-zA-Z]+/, // PascalCase symbols
+  /[a-z]+_[a-z_]+/, // snake_case symbols
+  /\d+\.\s+/, // numbered steps
+  /```[a-z]*\n/, // code blocks
+  /acceptance criteria/i,
+  /error[:\s]/i,
+  /test\s+(runner|suite|file)/i,
+];
+
+// Broad execution keywords that suggest underspecified work
+const BROAD_INDICATORS = [
+  "build me",
+  "create a",
+  "implement",
+  "develop",
+  "make a",
+  "write a",
+  "design a",
+  "set up",
+  "add feature",
+  "new feature",
+  "improve",
+  "optimize",
+  "refactor",
+  "fix this",
+  "update the",
+];
+
+const BYPASS_PREFIXES = ["force:", "! "];
+
+function hasBypassPrefix(text: string): boolean {
+  const trimmed = text.trim().toLowerCase();
+  return BYPASS_PREFIXES.some((p) => trimmed.startsWith(p));
+}
+
+function hasConcreteAnchor(text: string): boolean {
+  return CONCRETE_ANCHORS.some((re) => re.test(text));
+}
+
 function looksLikeBroadRequest(text: string): boolean {
-  const broadIndicators = [
-    "build me",
-    "create a",
-    "implement",
-    "develop",
-    "make a",
-    "write a",
-    "design a",
-    "set up",
-    "add feature",
-    "new feature",
-  ];
   const lower = text.toLowerCase();
-  return broadIndicators.some((ind) => lower.includes(ind)) && text.length > 40;
+  // Must have a broad indicator
+  const hasBroad = BROAD_INDICATORS.some((ind) => lower.includes(ind));
+  // Must be reasonably short (<= 15 effective words) OR lack concrete anchors
+  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  const isShort = words.length <= 15;
+  const hasAnchor = hasConcreteAnchor(text);
+
+  // Gate fires when: broad indicator present AND short AND no concrete anchor
+  return hasBroad && isShort && !hasAnchor;
 }
