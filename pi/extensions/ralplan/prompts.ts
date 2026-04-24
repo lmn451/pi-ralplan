@@ -398,7 +398,7 @@ export function getTransitionPrompt(fromStage: string, toStage: string | "comple
 
 All pipeline stages have completed successfully!
 
-Signal: RALPLAN_PIPELINE_COMPLETE
+Signal: ${RALPLAN_COMPLETION_SIGNAL}
 `;
   }
 
