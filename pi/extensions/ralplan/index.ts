@@ -559,6 +559,7 @@ ${prompt}`,
       updateUI(ctx);
 
       if (result.phase === "complete") {
+        ctx.ui.notify("RALPLAN Pipeline Complete! ✓ All stages finished successfully.", "success");
         pi.sendMessage(
           {
             customType: "ralplan-complete",
