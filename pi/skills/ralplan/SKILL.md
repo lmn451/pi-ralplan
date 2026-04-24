@@ -23,24 +23,44 @@ description: |
 3. **No self-approval.** The parent agent MUST NOT generate approval signatures, simulate subagent consensus, or append a "consensus signatures" section to documents it wrote. Approval must come from subagent output.
 4. **Iterate for real.** If Architect or Critic rejects or requests revisions, the Planner MUST be respawned with the feedback to produce a revised plan. Simply editing the document yourself between "rounds" violates the protocol.
 
+## Subagent Spawning
+
+### If `subagent` tool is available
+Use the `subagent` tool in **chain mode** to delegate each role to an isolated agent process:
+- Step 1: `subagent` with `agent: "planner"`, task = spec + planner.md prompt
+- Step 2: `subagent` with `agent: "architect"`, task = plan draft + architect.md prompt  
+- Step 3: `subagent` with `agent: "critic"`, task = plan draft + architect feedback + critic.md prompt
+- If rejected, chain back to planner with feedback, then re-run architect/critic
+
+**Do NOT use MCP for subagent spawning.** The `subagent` tool is a native pi extension. If it is not in your available tools list, it is not loaded.
+
+### If `subagent` tool is NOT available
+The parent agent must perform **genuine sequential deliberation** with strict separation:
+1. **Planner pass**: Generate the complete plan. STOP. Do not proceed to review in the same completion.
+2. **Architect pass**: In a new reasoning block, adopt the Architect persona fully. Review the plan with steelman antithesis and tradeoff tension. Write out explicit findings.
+3. **Critic pass**: In a new reasoning block, adopt the Critic persona fully. Challenge assumptions, identify gaps, enforce gate checks. Write out explicit verdict (REJECT / REVISE / ACCEPT).
+4. **Revision loop**: If Architect or Critic issued REJECT or REVISE, go back to step 1 (Planner pass) with their feedback incorporated. Repeat until ACCEPT from both or max 5 iterations.
+
+**CRITICAL**: "Simulating" the three roles in a single generation — outputting Planner → Architect → Critic sections all at once without stopping to actually evaluate — is **prohibited**. Each role must be given the opportunity to genuinely challenge the previous output.
+
 ## Workflow
 
 ### Phase 1: Idea Expansion
-1. Spawn an `analyst` subagent to extract requirements
-2. Spawn an `architect` subagent for technical design
+1. Delegate to an `analyst` (via `subagent` tool if available, otherwise perform as a dedicated pass) to extract requirements
+2. Delegate to an `architect` (via `subagent` tool if available, otherwise perform as a dedicated pass) for technical design
 3. Combine into a spec document at `.pi/ralplan/plans/spec.md`
 
 ### Phase 2: Consensus Planning
-**MANDATORY:** Each role MUST be executed by a separately spawned subagent using the role-specific prompts in `prompts/`. The parent agent MUST NOT perform the work of Planner, Architect, or Critic itself. Self-approval or generating consensus signatures without actual subagent execution is strictly prohibited.
+Follow the **Subagent Spawning** rules above. If using the `subagent` tool, chain Planner → Architect → Critic. If not available, perform genuine sequential deliberation with strict persona separation.
 
-1. **Planner** subagent creates initial implementation plan from spec with RALPLAN-DR summary:
+1. **Planner** creates initial implementation plan from spec with RALPLAN-DR summary:
    - **Principles** (3-5)
    - **Decision Drivers** (top 3)
    - **Viable Options** (>=2) with bounded pros/cons
    - If only 1 viable option, explicit invalidation rationale for alternatives
-2. **Architect** subagent reviews for technical feasibility — must provide strongest steelman antithesis + at least one real tradeoff tension
-3. **Critic** subagent challenges assumptions, identifies gaps — must enforce principle-option consistency, fair alternatives, risk mitigation clarity, testable acceptance criteria
-4. **Iterate** with real back-and-forth until all three subagents approve (max 5 iterations). Each iteration must spawn subagents anew with the revised artifact and previous feedback.
+2. **Architect** reviews for technical feasibility — must provide strongest steelman antithesis + at least one real tradeoff tension
+3. **Critic** challenges assumptions, identifies gaps — must enforce principle-option consistency, fair alternatives, risk mitigation clarity, testable acceptance criteria
+4. **Iterate** with real back-and-forth until all three approve (max 5 iterations). Each iteration must re-invoke the role with the revised artifact and previous feedback.
 5. Save final plan to `.pi/ralplan/plans/plan.md`
 
 ### Deliberate Mode

@@ -6,7 +6,7 @@ This document describes the full consensus-driven planning workflow used by RALP
 
 RALPLAN uses three specialized roles — Planner, Architect, and Critic — to iteratively refine an implementation plan until all three agree it is sound.
 
-**Hard rule:** Approval and consensus signatures MUST come from actual subagent output. The parent agent MUST NOT generate approvals, simulate consensus, or append signatures to documents it produced.
+**Hard rule:** Approval and consensus signatures MUST come from actual independent evaluation. Prefer the `subagent` tool in chain mode to isolate each role in its own process. If `subagent` is unavailable, the parent agent must perform genuine sequential deliberation with strict persona separation — never single-pass simulation.
 
 ## Roles
 
@@ -31,17 +31,19 @@ RALPLAN uses three specialized roles — Planner, Architect, and Critic — to i
 
 ## Iteration Loop
 
-Each arrow represents spawning a subagent with the relevant role prompt and the current artifact. The parent agent MUST NOT perform reviews or revisions itself.
+Each arrow represents an independent evaluation by the relevant role. Use the `subagent` tool in chain mode if available; otherwise perform as strict sequential passes.
 
 ```
-Spawn Planner subagent → creates plan
+Planner → creates plan
     ↓
-Spawn Architect subagent → reviews → REJECTED? → Spawn Planner subagent → revises
+Architect → reviews → REJECTED? → Planner → revises
     ↓ APPROVED
-Spawn Critic subagent → reviews → REJECTED? → Spawn Planner subagent → revises
+Critic → reviews → REJECTED? → Planner → revises
     ↓ APPROVED
 Consensus reached → Save final plan
 ```
+
+**If `subagent` tool is unavailable:** Each box above becomes a dedicated reasoning pass where the parent agent fully adopts that role's persona and prompt before producing output.
 
 ## Termination Conditions
 
