@@ -8,6 +8,17 @@ export interface PlanningArtifacts {
   testSpecPaths: string[];
 }
 
+export function getDefaultArtifactFilename(type: "spec" | "plan" | "test-spec"): string {
+  switch (type) {
+    case "spec":
+      return "spec.md";
+    case "plan":
+      return "plan.md";
+    case "test-spec":
+      return "test-spec.md";
+  }
+}
+
 function readFileSafe(path: string): string | null {
   try {
     return readFileSync(path, "utf-8");
@@ -93,7 +104,13 @@ export function isPlanningComplete(artifacts: PlanningArtifacts): boolean {
 
   return (
     hasRequiredSections(latestSpec, ["Acceptance criteria", "Requirement coverage map"]) &&
-    hasRequiredSections(latestPlan, ["Unit coverage", "Verification mapping"])
+    hasRequiredSections(latestPlan, [
+      "Architecture Decision Record (ADR)",
+      "Task Breakdown",
+      "Dependency Graph",
+      "Acceptance Criteria per Task",
+      "Risk Register",
+    ])
   );
 }
 

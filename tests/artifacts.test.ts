@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  getDefaultArtifactFilename,
   readPlanningArtifacts,
   isPlanningComplete,
   writeArtifact,
@@ -68,7 +69,7 @@ describe("isPlanningComplete", () => {
     writeFileSync(join(plansDir, "spec.md"), "# Spec\n\nNo sections here.", "utf-8");
     writeFileSync(
       join(plansDir, "plan.md"),
-      "# Plan\n\n## Unit coverage\n- Module A: 100%\n\n## Verification mapping\n- Test 1 verifies req 1\n",
+      "# Plan\n\n## Architecture Decision Record (ADR)\nDecision details\n\n## Task Breakdown\n- task\n\n## Dependency Graph\n- dep\n\n## Acceptance Criteria per Task\n- criterion\n\n## Risk Register\n- risk\n",
       "utf-8",
     );
     const artifacts = readPlanningArtifacts(tempDir);
@@ -83,11 +84,19 @@ describe("isPlanningComplete", () => {
     );
     writeFileSync(
       join(plansDir, "plan.md"),
-      "# Plan\n\n## Unit coverage\n- Module A: 100%\n\n## Verification mapping\n- Test 1 verifies req 1\n",
+      "# Plan\n\n## Architecture Decision Record (ADR)\nDecision details\n\n## Task Breakdown\n- task\n\n## Dependency Graph\n- dep\n\n## Acceptance Criteria per Task\n- criterion\n\n## Risk Register\n- risk\n",
       "utf-8",
     );
     const artifacts = readPlanningArtifacts(tempDir);
     expect(isPlanningComplete(artifacts)).toBe(true);
+  });
+});
+
+describe("getDefaultArtifactFilename", () => {
+  it("uses canonical filenames for stage artifacts", () => {
+    expect(getDefaultArtifactFilename("spec")).toBe("spec.md");
+    expect(getDefaultArtifactFilename("plan")).toBe("plan.md");
+    expect(getDefaultArtifactFilename("test-spec")).toBe("test-spec.md");
   });
 });
 

@@ -8,6 +8,7 @@ import {
   resolvePipelineConfig,
   getCurrentStageAdapter,
   advanceStage,
+  skipCurrentStage,
   incrementStageIteration,
   getPipelineStatus,
   formatPipelineHUD,
@@ -32,7 +33,7 @@ import {
 
 import { detectSignal, getLastAssistantText } from "./signals.js";
 import { getTransitionPrompt } from "./prompts.js";
-import { readPlanningArtifacts } from "./artifacts.js";
+import { getDefaultArtifactFilename, readPlanningArtifacts } from "./artifacts.js";
 
 // Register adapters globally
 registerAdapters([ralplanAdapter, executionAdapter, ralphAdapter, qaAdapter]);
@@ -266,12 +267,8 @@ ${prompt}`,
       }
 
       const { stages, currentStageIndex } = state.pipeline;
-      if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
-        stages[currentStageIndex].status = "skipped";
-      }
-
       const pipelineCtx = buildContext();
-      const result = advanceStage(state.pipeline, pipelineCtx ?? undefined);
+      const result = skipCurrentStage(state.pipeline, pipelineCtx ?? undefined);
       state.pipeline = result.tracking;
       persistState();
       updateUI(ctx);
@@ -411,8 +408,7 @@ ${prompt}`,
 
       ensureRalplanDir(process.cwd());
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const filename = params.filename || `${params.type}-${timestamp}.md`;
+      const filename = params.filename || getDefaultArtifactFilename(params.type);
       const path = writeArtifact(process.cwd(), filename, params.content);
 
       return {
@@ -447,7 +443,7 @@ ${prompt}`,
       if (params.execution) config.execution = params.execution;
 
       if (params.verification === "skip") config.verification = false;
-      else if (params.verification && config.verification !== false) {
+      else if (params.verification) {
         config.verification = { engine: "ralph", maxIterations: 100 };
       }
 

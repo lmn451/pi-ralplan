@@ -5,6 +5,7 @@ import {
   getCurrentStageAdapter,
   getNextStageAdapter,
   advanceStage,
+  skipCurrentStage,
   failCurrentStage,
   incrementStageIteration,
   getPipelineStatus,
@@ -214,6 +215,17 @@ describe("advanceStage", () => {
 
     // Restore
     registerAdapters([ralplanAdapter, executionAdapter, ralphAdapter, qaAdapter]);
+  });
+
+  it("marks skipped stages as skipped when explicitly skipped", () => {
+    const tracking = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
+    tracking.stages[0].status = "active";
+
+    const result = skipCurrentStage(tracking);
+
+    expect(result.phase).toBe("execution");
+    expect(tracking.stages[0].status).toBe("skipped");
+    expect(tracking.stages[1].status).toBe("active");
   });
 });
 

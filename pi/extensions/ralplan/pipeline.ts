@@ -204,6 +204,57 @@ export function advanceStage(
   return { adapter: nextAdapter, phase: stages[nextIndex].id, tracking };
 }
 
+export function skipCurrentStage(
+  tracking: PipelineTracking,
+  context?: PipelineContext,
+): {
+  adapter: PipelineStageAdapter | null;
+  phase: PipelinePhase;
+  tracking: PipelineTracking;
+} {
+  const { stages, currentStageIndex } = tracking;
+
+  if (context && currentStageIndex >= 0 && currentStageIndex < stages.length) {
+    const currentAdapter = getAdapterById(stages[currentStageIndex].id);
+    currentAdapter?.onExit?.(context);
+  }
+
+  if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
+    stages[currentStageIndex].status = "skipped";
+    stages[currentStageIndex].completedAt = nowISO();
+  }
+
+  let nextIndex = -1;
+  for (let i = currentStageIndex + 1; i < stages.length; i++) {
+    if (stages[i].status !== "skipped") {
+      nextIndex = i;
+      break;
+    }
+  }
+
+  if (nextIndex < 0) {
+    tracking.currentStageIndex = stages.length;
+    return { adapter: null, phase: "complete", tracking };
+  }
+
+  tracking.currentStageIndex = nextIndex;
+  stages[nextIndex].status = "active";
+  stages[nextIndex].startedAt = nowISO();
+
+  const nextAdapter = getAdapterById(stages[nextIndex].id);
+  if (!nextAdapter) {
+    stages[nextIndex].status = "failed";
+    stages[nextIndex].error = `No adapter registered for stage "${stages[nextIndex].id}"`;
+    return { adapter: null, phase: "failed", tracking };
+  }
+
+  if (context) {
+    nextAdapter.onEnter?.(context);
+  }
+
+  return { adapter: nextAdapter, phase: stages[nextIndex].id, tracking };
+}
+
 export function failCurrentStage(tracking: PipelineTracking, error: string): PipelineTracking {
   const { stages, currentStageIndex } = tracking;
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
