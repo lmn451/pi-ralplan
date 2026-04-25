@@ -155,9 +155,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
 
     if (ralplanEntry?.data) {
       const data = ralplanEntry.data;
+      const status = getPipelineStatus(data.tracking);
       state = {
         version: 1,
-        active: data.active,
+        active: status.isComplete ? false : data.active,
         pipeline: data.tracking,
         originalIdea: data.originalIdea,
         specPath: data.specPath,
@@ -619,7 +620,7 @@ ${prompt}`,
 All stages finished successfully.`,
             display: true,
           },
-          { triggerTurn: false },
+          { triggerTurn: false, deliverAs: "followUp" },
         );
         deactivateState();
         updateUI(ctx);
@@ -635,7 +636,7 @@ All stages finished successfully.`,
 Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
             display: true,
           },
-          { triggerTurn: false },
+          { triggerTurn: false, deliverAs: "followUp" },
         );
         deactivateState();
         updateUI(ctx);
