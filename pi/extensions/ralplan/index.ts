@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 
@@ -33,7 +36,11 @@ import {
 
 import { detectSignal, getLastAssistantText } from "./signals.js";
 import { getTransitionPrompt } from "./prompts.js";
-import { getDefaultArtifactFilename, readPlanningArtifacts } from "./artifacts.js";
+import {
+  getDefaultArtifactFilename,
+  readPlanningArtifacts,
+} from "./artifacts.js";
+import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 
 // Register adapters globally
 registerAdapters([ralplanAdapter, executionAdapter, ralphAdapter, qaAdapter]);
@@ -67,6 +74,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   // Track whether we auto-started from --ralplan flag (only once)
   let autoStartedFromFlag = false;
 
+  // Captured working directory — set once at session start or /ralplan command
+  let sessionCwd: string = process.cwd();
+
   // ==========================================================================
   // HELPERS
   // ==========================================================================
@@ -79,7 +89,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     if (!state) return null;
     return {
       idea: state.originalIdea,
-      directory: process.cwd(),
+      directory: sessionCwd,
       sessionId: state.sessionId,
       specPath: state.specPath,
       planPath: state.planPath,
@@ -99,7 +109,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       sessionId: state.sessionId,
     };
     pi.appendEntry(CUSTOM_TYPE, persisted);
-    writeRalplanStateFile(process.cwd(), state);
+    writeRalplanStateFile(sessionCwd, state);
   }
 
   function deactivateState(): void {
@@ -109,7 +119,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       persistState();
     }
     state = null;
-    clearRalplanStateFile(process.cwd());
+    clearRalplanStateFile(sessionCwd);
   }
 
   function updateUI(ctx: ExtensionContext): void {
@@ -123,7 +133,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     const currentName =
       getCurrentStageAdapter(state.pipeline)?.name ??
       (status.isComplete ? "Complete" : "None");
-    ctx.ui.setStatus("ralplan", ctx.ui.theme.fg("accent", `📋 ${currentName} (${status.progress})`));
+    ctx.ui.setStatus(
+      "ralplan",
+      ctx.ui.theme.fg("accent", `📋 ${currentName} (${status.progress})`),
+    );
 
     const hud = formatPipelineHUD(state.pipeline);
     ctx.ui.setWidget("ralplan-progress", hud);
@@ -135,11 +148,8 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     // Find the most recent ralplan-state entry
     const ralplanEntry = entries
       .filter(
-        (e: {
-          type: string;
-          customType?: string;
-          data?: PersistedState;
-        }) => e.type === "custom" && e.customType === CUSTOM_TYPE,
+        (e: { type: string; customType?: string; data?: PersistedState }) =>
+          e.type === "custom" && e.customType === CUSTOM_TYPE,
       )
       .pop() as { data?: PersistedState } | undefined;
 
@@ -153,13 +163,14 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         specPath: data.specPath,
         planPath: data.planPath,
         sessionId: data.sessionId,
-        startedAt: data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
+        startedAt:
+          data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
       };
       return;
     }
 
     // Fallback to file-based state
-    const fileState = readRalplanStateFile(process.cwd());
+    const fileState = readRalplanStateFile(sessionCwd);
     if (fileState) {
       state = fileState;
     }
@@ -170,7 +181,8 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   // ==========================================================================
 
   pi.registerFlag("ralplan", {
-    description: "Start a RALPLAN consensus planning session with the initial prompt",
+    description:
+      "Start a RALPLAN consensus planning session with the initial prompt",
     type: "boolean",
     default: false,
   });
@@ -230,7 +242,10 @@ ${prompt}`,
     description: "Show current pipeline status",
     handler: async (_args, ctx) => {
       if (!isActive() || !state) {
-        ctx.ui.notify("No active RALPLAN session. Use /ralplan to start one.", "info");
+        ctx.ui.notify(
+          "No active RALPLAN session. Use /ralplan to start one.",
+          "info",
+        );
         return;
       }
 
@@ -249,7 +264,10 @@ ${prompt}`,
         return;
       }
 
-      const ok = await ctx.ui.confirm("Cancel RALPLAN?", "This will discard the current pipeline.");
+      const ok = await ctx.ui.confirm(
+        "Cancel RALPLAN?",
+        "This will discard the current pipeline.",
+      );
       if (!ok) return;
 
       deactivateState();
@@ -280,7 +298,10 @@ ${prompt}`,
       }
 
       if (result.phase === "failed") {
-        ctx.ui.notify(`RALPLAN stage failed: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`, "error");
+        ctx.ui.notify(
+          `RALPLAN stage failed: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
+          "error",
+        );
         deactivateState();
         return;
       }
@@ -303,21 +324,30 @@ ${prompt}`,
   pi.registerCommand("ralplan:artifacts", {
     description: "List planning artifacts",
     handler: async (_args, ctx) => {
-      const artifacts = readPlanningArtifacts(process.cwd());
+      const artifacts = readPlanningArtifacts(sessionCwd);
       const parts: string[] = [];
 
       if (artifacts.specPaths.length > 0) {
-        parts.push(`**Specs:**\n${artifacts.specPaths.map((p) => `- ${p}`).join("\n")}`);
+        parts.push(
+          `**Specs:**\n${artifacts.specPaths.map((p) => `- ${p}`).join("\n")}`,
+        );
       }
       if (artifacts.planPaths.length > 0) {
-        parts.push(`**Plans:**\n${artifacts.planPaths.map((p) => `- ${p}`).join("\n")}`);
+        parts.push(
+          `**Plans:**\n${artifacts.planPaths.map((p) => `- ${p}`).join("\n")}`,
+        );
       }
       if (artifacts.testSpecPaths.length > 0) {
-        parts.push(`**Test Specs:**\n${artifacts.testSpecPaths.map((p) => `- ${p}`).join("\n")}`);
+        parts.push(
+          `**Test Specs:**\n${artifacts.testSpecPaths.map((p) => `- ${p}`).join("\n")}`,
+        );
       }
 
       if (parts.length === 0) {
-        ctx.ui.notify("No planning artifacts found in .pi/ralplan/plans/", "info");
+        ctx.ui.notify(
+          "No planning artifacts found in .pi/ralplan/plans/",
+          "info",
+        );
       } else {
         ctx.ui.notify(parts.join("\n\n"), "info");
       }
@@ -333,7 +363,9 @@ ${prompt}`,
     label: "Advance RALPLAN",
     description: "Explicitly advance to the next pipeline stage",
     parameters: Type.Object({
-      reason: Type.Optional(Type.String({ description: "Reason for advancement" })),
+      reason: Type.Optional(
+        Type.String({ description: "Reason for advancement" }),
+      ),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!isActive() || !state) {
@@ -343,7 +375,8 @@ ${prompt}`,
         };
       }
 
-      const currentId = state.pipeline.stages[state.pipeline.currentStageIndex]?.id;
+      const currentId =
+        state.pipeline.stages[state.pipeline.currentStageIndex]?.id;
       const pipelineCtx = buildContext();
       const result = advanceStage(state.pipeline, pipelineCtx ?? undefined);
       state.pipeline = result.tracking;
@@ -353,7 +386,12 @@ ${prompt}`,
       if (result.phase === "complete") {
         deactivateState();
         return {
-          content: [{ type: "text", text: "RALPLAN pipeline complete! All stages finished." }],
+          content: [
+            {
+              type: "text",
+              text: "RALPLAN pipeline complete! All stages finished.",
+            },
+          ],
           details: { phase: "complete" },
         };
       }
@@ -361,7 +399,12 @@ ${prompt}`,
       if (result.phase === "failed") {
         deactivateState();
         return {
-          content: [{ type: "text", text: `RALPLAN stage failed: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}` }],
+          content: [
+            {
+              type: "text",
+              text: `RALPLAN stage failed: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
+            },
+          ],
           details: { phase: "failed" },
           isError: true,
         };
@@ -396,20 +439,26 @@ ${prompt}`,
   pi.registerTool({
     name: "ralplan_submit_artifact",
     label: "Submit RALPLAN Artifact",
-    description: "Submit a planning artifact (spec, plan, test-spec) to the ralplan pipeline",
+    description:
+      "Submit a planning artifact (spec, plan, test-spec) to the ralplan pipeline",
     parameters: Type.Object({
       type: StringEnum(["spec", "plan", "test-spec"] as const),
       content: Type.String({ description: "Markdown content of the artifact" }),
-      filename: Type.Optional(Type.String({ description: "Custom filename (default: auto-generated)" })),
+      filename: Type.Optional(
+        Type.String({
+          description: "Custom filename (default: auto-generated)",
+        }),
+      ),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { writeArtifact } = await import("./artifacts.js");
       const { ensureRalplanDir } = await import("./utils.js");
 
-      ensureRalplanDir(process.cwd());
+      ensureRalplanDir(sessionCwd);
 
-      const filename = params.filename || getDefaultArtifactFilename(params.type);
-      const path = writeArtifact(process.cwd(), filename, params.content);
+      const filename =
+        params.filename || getDefaultArtifactFilename(params.type);
+      const path = writeArtifact(sessionCwd, filename, params.content);
 
       return {
         content: [{ type: "text", text: `Artifact saved to ${path}` }],
@@ -423,7 +472,9 @@ ${prompt}`,
     label: "Set RALPLAN Config",
     description: "Modify pipeline configuration mid-flight",
     parameters: Type.Object({
-      planning: Type.Optional(StringEnum(["ralplan", "direct", "skip"] as const)),
+      planning: Type.Optional(
+        StringEnum(["ralplan", "direct", "skip"] as const),
+      ),
       execution: Type.Optional(StringEnum(["team", "solo"] as const)),
       verification: Type.Optional(StringEnum(["ralph", "skip"] as const)),
       qa: Type.Optional(Type.Boolean()),
@@ -531,7 +582,8 @@ ${prompt}`,
   pi.on("agent_end", async (event, ctx) => {
     if (!isActive() || !state) return;
 
-    const currentStage = state.pipeline.stages[state.pipeline.currentStageIndex];
+    const currentStage =
+      state.pipeline.stages[state.pipeline.currentStageIndex];
     if (!currentStage) return;
 
     // Deduplication: get the last entry ID to avoid re-advancing on the same turn
@@ -555,7 +607,10 @@ ${prompt}`,
       updateUI(ctx);
 
       if (result.phase === "complete") {
-        ctx.ui.notify("RALPLAN Pipeline Complete! ✓ All stages finished successfully.", "success");
+        ctx.ui.notify(
+          "RALPLAN Pipeline Complete! ✓ All stages finished successfully.",
+          "success",
+        );
         pi.sendMessage(
           {
             customType: "ralplan-complete",
@@ -616,65 +671,4 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
     persistState();
     updateUI(ctx);
   });
-}
-
-// ============================================================================
-// HEURISTICS
-// ============================================================================
-
-// Concrete anchors that indicate a well-specified request (passes the gate)
-const CONCRETE_ANCHORS = [
-  /[a-zA-Z0-9_\-./]+\.[a-zA-Z]{2,}/, // file paths with extensions
-  /#[0-9]+/, // issue/PR numbers
-  /[a-z]+[A-Z][a-zA-Z]+/, // camelCase symbols
-  /[A-Z][a-z]+[A-Z][a-zA-Z]+/, // PascalCase symbols
-  /[a-z]+_[a-z_]+/, // snake_case symbols
-  /\d+\.\s+/, // numbered steps
-  /```[a-z]*\n/, // code blocks
-  /acceptance criteria/i,
-  /error[:\s]/i,
-  /test\s+(runner|suite|file)/i,
-];
-
-// Broad execution keywords that suggest underspecified work
-const BROAD_INDICATORS = [
-  "build me",
-  "create a",
-  "implement",
-  "develop",
-  "make a",
-  "write a",
-  "design a",
-  "set up",
-  "add feature",
-  "new feature",
-  "improve",
-  "optimize",
-  "refactor",
-  "fix this",
-  "update the",
-];
-
-const BYPASS_PREFIXES = ["force:", "! "];
-
-function hasBypassPrefix(text: string): boolean {
-  const trimmed = text.trim().toLowerCase();
-  return BYPASS_PREFIXES.some((p) => trimmed.startsWith(p));
-}
-
-function hasConcreteAnchor(text: string): boolean {
-  return CONCRETE_ANCHORS.some((re) => re.test(text));
-}
-
-function looksLikeBroadRequest(text: string): boolean {
-  const lower = text.toLowerCase();
-  // Must have a broad indicator
-  const hasBroad = BROAD_INDICATORS.some((ind) => lower.includes(ind));
-  // Must be reasonably short (<= 15 effective words) OR lack concrete anchors
-  const words = text.split(/\s+/).filter((w) => w.length > 0);
-  const isShort = words.length <= 15;
-  const hasAnchor = hasConcreteAnchor(text);
-
-  // Gate fires when: broad indicator present AND short AND no concrete anchor
-  return hasBroad && isShort && !hasAnchor;
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, afterEach } from "bun:test";
 import {
   resolvePipelineConfig,
   buildPipelineTracking,
@@ -26,14 +26,28 @@ import {
   qaAdapter,
 } from "../pi/extensions/ralplan/adapters.js";
 
-registerAdapters([ralplanAdapter, executionAdapter, ralphAdapter, qaAdapter]);
+const DEFAULT_ADAPTERS = [
+  ralplanAdapter,
+  executionAdapter,
+  ralphAdapter,
+  qaAdapter,
+] as const;
+registerAdapters([...DEFAULT_ADAPTERS]);
+
+// Restore default adapters after every test to prevent cross-test leakage
+afterEach(() => {
+  registerAdapters([...DEFAULT_ADAPTERS]);
+});
 
 describe("resolvePipelineConfig", () => {
   it("returns defaults when no overrides given", () => {
     const config = resolvePipelineConfig();
     expect(config.planning).toBe("ralplan");
     expect(config.execution).toBe("solo");
-    expect(config.verification).toEqual({ engine: "ralph", maxIterations: 100 });
+    expect(config.verification).toEqual({
+      engine: "ralph",
+      maxIterations: 100,
+    });
     expect(config.qa).toBe(true);
   });
 
@@ -46,7 +60,10 @@ describe("resolvePipelineConfig", () => {
     expect(config.planning).toBe("direct");
     expect(config.execution).toBe("team");
     expect(config.qa).toBe(false);
-    expect(config.verification).toEqual({ engine: "ralph", maxIterations: 100 });
+    expect(config.verification).toEqual({
+      engine: "ralph",
+      maxIterations: 100,
+    });
   });
 
   it("allows disabling verification", () => {
@@ -161,7 +178,12 @@ describe("advanceStage", () => {
     const tracking: PipelineTracking = {
       pipelineConfig: DEFAULT_PIPELINE_CONFIG,
       stages: [
-        { id: "ralplan", status: "complete", iterations: 0, completedAt: "2024-01-01" },
+        {
+          id: "ralplan",
+          status: "complete",
+          iterations: 0,
+          completedAt: "2024-01-01",
+        },
         { id: "execution", status: "pending", iterations: 0 },
         { id: "ralph", status: "skipped", iterations: 0 },
         { id: "qa", status: "skipped", iterations: 0 },
@@ -174,9 +196,9 @@ describe("advanceStage", () => {
     expect(result.phase).toBe("failed");
     expect(result.adapter).toBeNull();
     expect(tracking.stages[1].status).toBe("failed");
-    expect(tracking.stages[1].error).toContain('No adapter registered for stage "execution"');
-    // Restore adapters
-    registerAdapters([ralplanAdapter, executionAdapter, ralphAdapter, qaAdapter]);
+    expect(tracking.stages[1].error).toContain(
+      'No adapter registered for stage "execution"',
+    );
   });
 
   it("calls onExit and onEnter lifecycle hooks", () => {
@@ -203,7 +225,12 @@ describe("advanceStage", () => {
     };
 
     registerAdapters([mockAdapter, mockExec]);
-    const config: PipelineConfig = { planning: "ralplan", execution: "solo", verification: false, qa: false };
+    const config: PipelineConfig = {
+      planning: "ralplan",
+      execution: "solo",
+      verification: false,
+      qa: false,
+    };
     const tracking = buildPipelineTracking(config);
     tracking.stages[0].status = "active";
 
@@ -212,9 +239,6 @@ describe("advanceStage", () => {
 
     expect(exited).toContain("ralplan-exit");
     expect(entered).toContain("execution-enter");
-
-    // Restore
-    registerAdapters([ralplanAdapter, executionAdapter, ralphAdapter, qaAdapter]);
   });
 
   it("marks skipped stages as skipped when explicitly skipped", () => {

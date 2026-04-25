@@ -7,7 +7,10 @@ export const RALPH_COMPLETION_SIGNAL = "PIPELINE_RALPH_COMPLETE";
 export const QA_COMPLETION_SIGNAL = "PIPELINE_QA_COMPLETE";
 
 /** Generate the expansion phase prompt (Phase 0) */
-export function getExpansionPrompt(idea: string, openQuestionsPath?: string): string {
+export function getExpansionPrompt(
+  idea: string,
+  openQuestionsPath?: string,
+): string {
   const oqPath = openQuestionsPath || ".pi/ralplan/plans/open-questions.md";
   return `## IDEA EXPANSION
 
@@ -280,7 +283,10 @@ For each failure:
 }
 
 /** Generate the ralph verification prompt */
-export function getRalphPrompt(specPath: string, maxIterations: number): string {
+export function getRalphPrompt(
+  specPath: string,
+  maxIterations: number,
+): string {
   return `## VERIFICATION (RALPH)
 
 Verify the implementation against the specification using the Ralph verification loop.
@@ -392,13 +398,14 @@ Signal: ${RALPLAN_COMPLETION_SIGNAL}`;
 }
 
 /** Generate a stage transition prompt */
-export function getTransitionPrompt(fromStage: string, toStage: string | "complete"): string {
+export function getTransitionPrompt(
+  fromStage: string,
+  toStage: string | "complete",
+): string {
   if (toStage === "complete") {
     return `## PIPELINE COMPLETE
 
 All pipeline stages have completed successfully!
-
-Signal: ${RALPLAN_COMPLETION_SIGNAL}
 `;
   }
 
