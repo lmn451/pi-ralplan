@@ -9,6 +9,9 @@ import {
   getExecutionPrompt,
   getRalphPrompt,
   getQAPrompt,
+  getBrainstormExpansionPrompt,
+  getBrainstormResumePrompt,
+  getBrainstormSteeringPrompt,
   RALPLAN_COMPLETION_SIGNAL,
   EXECUTION_COMPLETION_SIGNAL,
   RALPH_COMPLETION_SIGNAL,
@@ -30,6 +33,23 @@ export const ralplanAdapter: PipelineStageAdapter = {
   },
 
   getPrompt(context: PipelineContext): string {
+    // Brainstorm mode dispatch
+    if (context.mode === "brainstorm") {
+      const sub = context.brainstorm?.subPhase ?? "expanding";
+      switch (sub) {
+        case "expanding":
+          return getBrainstormExpansionPrompt(context);
+        case "awaiting-answers":
+          // Steering prompt to keep AI from going off-track
+          return getBrainstormSteeringPrompt();
+        case "planning":
+          return getBrainstormResumePrompt(context);
+        default:
+          return getBrainstormExpansionPrompt(context);
+      }
+    }
+
+    // Existing ralplan mode
     if (context.config.planning === "ralplan") {
       return getConsensusPlanningPrompt(context);
     }

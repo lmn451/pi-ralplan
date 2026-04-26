@@ -13,6 +13,11 @@ export function resolvePlansDir(directory: string): string {
   return join(directory, ".pi", "ralplan", "plans");
 }
 
+/** Resolve the answers file path */
+export function resolveAnswersPath(directory: string): string {
+  return join(directory, ".pi", "ralplan", "plans", "answers.md");
+}
+
 /** Resolve the ralplan state file path */
 export function resolveStatePath(directory: string): string {
   return join(directory, ".pi", "ralplan", "state.json");

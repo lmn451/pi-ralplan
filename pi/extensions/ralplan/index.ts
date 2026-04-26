@@ -4,6 +4,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
+import { readFileSync } from "node:fs";
 
 import {
   registerAdapters,
@@ -32,15 +33,49 @@ import {
   clearRalplanStateFile,
   buildDefaultState,
   type RalplanState,
+  type RalplanMode,
 } from "./state.js";
 
-import { detectSignal, getLastAssistantText } from "./signals.js";
-import { getTransitionPrompt } from "./prompts.js";
+import {
+  detectSignal,
+  detectBrainstormSignal,
+  getLastAssistantText,
+  BRAINSTORM_OPEN_QUESTIONS_READY,
+} from "./signals.js";
+
+import {
+  getTransitionPrompt,
+  getBrainstormAwaitingPrompt,
+  getBrainstormSteeringPrompt,
+  getBrainstormResumePrompt,
+} from "./prompts.js";
+
 import {
   getDefaultArtifactFilename,
   readPlanningArtifacts,
+  appendArtifact,
 } from "./artifacts.js";
+
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
+import {
+  resolveOpenQuestionsPath,
+} from "./utils.js";
+
+import {
+  createBrainstormState,
+  transitionSubPhase,
+  appendAnswer,
+  withQuestions,
+  shouldSuppressSignals,
+  isBrainstormMode,
+  isAwaitingAnswers,
+  parseOpenQuestions,
+  skipQuestions,
+  doneAnswering,
+  processBrainstormAgentEnd,
+  processBrainstormInput,
+  type BrainstormState,
+} from "./brainstorm.js";
 
 // Register adapters globally
 registerAdapters([ralplanAdapter, executionAdapter, ralphAdapter, qaAdapter]);
@@ -56,6 +91,9 @@ interface PersistedState {
   specPath: string;
   planPath: string;
   sessionId?: string;
+  mode?: RalplanMode;
+  answersPath?: string;
+  brainstorm?: BrainstormState;
 }
 
 const CUSTOM_TYPE = "ralplan-state";
@@ -71,8 +109,8 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   // Signal deduplication: track the last entry ID we advanced from
   let lastAdvancedEntryId: string | null = null;
 
-  // Track whether we auto-started from --ralplan flag (only once)
-  let autoStartedFromFlag = false;
+  // Auto-start mode discriminant (replaces boolean)
+  let autoStartMode: "ralplan" | "brainstorm" | null = null;
 
   // Captured working directory — set once at session start or /ralplan command
   let sessionCwd: string = process.cwd();
@@ -94,7 +132,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       specPath: state.specPath,
       planPath: state.planPath,
       openQuestionsPath: ".pi/ralplan/plans/open-questions.md",
+      answersPath: state.answersPath,
       config: state.pipeline.pipelineConfig,
+      mode: state.mode,
+      brainstorm: state.brainstorm,
     };
   }
 
@@ -107,6 +148,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       specPath: state.specPath || ".pi/ralplan/plans/spec.md",
       planPath: state.planPath || ".pi/ralplan/plans/plan.md",
       sessionId: state.sessionId,
+      mode: state.mode,
+      answersPath: state.answersPath,
+      brainstorm: state.brainstorm,
     };
     pi.appendEntry(CUSTOM_TYPE, persisted);
     writeRalplanStateFile(sessionCwd, state);
@@ -126,6 +170,28 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     if (!isActive() || !state) {
       ctx.ui.setStatus("ralplan", undefined);
       ctx.ui.setWidget("ralplan-progress", undefined);
+      return;
+    }
+
+    // Brainstorm sub-phase status
+    if (state.mode === "brainstorm" && state.brainstorm) {
+      const sub = state.brainstorm.subPhase;
+      let statusText: string;
+      switch (sub) {
+        case "expanding":
+          statusText = "🧠 Expanding...";
+          break;
+        case "awaiting-answers":
+          statusText = `🧠 Awaiting Answers (${state.brainstorm.questions.length} questions)`;
+          break;
+        case "planning":
+          statusText = "🧠 Planning (Consensus)";
+          break;
+        default:
+          statusText = "🧠 Brainstorm";
+      }
+      ctx.ui.setStatus("ralplan", ctx.ui.theme.fg("accent", statusText));
+      ctx.ui.setWidget("ralplan-progress", formatPipelineHUD(state.pipeline));
       return;
     }
 
@@ -157,12 +223,15 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       const data = ralplanEntry.data;
       const status = getPipelineStatus(data.tracking);
       state = {
-        version: 1,
+        version: 2,
         active: status.isComplete ? false : data.active,
+        mode: data.mode ?? "ralplan",
         pipeline: data.tracking,
         originalIdea: data.originalIdea,
         specPath: data.specPath,
         planPath: data.planPath,
+        answersPath: data.answersPath,
+        brainstorm: data.brainstorm,
         sessionId: data.sessionId,
         startedAt:
           data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
@@ -188,15 +257,28 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     default: false,
   });
 
+  pi.registerFlag("brainstorm", {
+    description:
+      "Start a brainstorm-mode session with the initial prompt",
+    type: "boolean",
+    default: false,
+  });
+
   pi.registerCommand("ralplan", {
     description: "Start consensus planning for an idea",
     handler: async (args, ctx) => {
-      const idea = args.trim() || "Implement the requested feature";
+      if (isActive()) {
+        ctx.ui.notify(
+          "A planning session is already active. Use /ralplan:cancel to end it first.",
+          "info",
+        );
+        return;
+      }
 
+      const idea = args.trim() || "Implement the requested feature";
       const config = resolvePipelineConfig();
       const tracking = buildPipelineTracking(config);
 
-      // Activate first stage
       if (
         tracking.currentStageIndex >= 0 &&
         tracking.currentStageIndex < tracking.stages.length
@@ -206,13 +288,12 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
           new Date().toISOString();
       }
 
-      state = buildDefaultState(idea, tracking, undefined);
+      state = buildDefaultState(idea, tracking, undefined, "ralplan", sessionCwd);
       persistState();
       updateUI(ctx);
 
       ctx.ui.notify(`RALPLAN started: ${idea}`, "info");
 
-      // Trigger the first stage immediately
       const context = buildContext();
       if (context) {
         const adapter = getCurrentStageAdapter(tracking);
@@ -222,6 +303,62 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
             {
               customType: "ralplan-start",
               content: `## RALPLAN Pipeline Started
+
+Idea: ${idea}
+Stages: ${tracking.stages
+                .filter((s) => s.status !== "skipped")
+                .map((s) => s.id)
+                .join(" → ")}
+
+${prompt}`,
+              display: true,
+            },
+            { triggerTurn: true, deliverAs: "steer" },
+          );
+        }
+      }
+    },
+  });
+
+  pi.registerCommand("brainstorm", {
+    description: "Start brainstorm planning for an idea (user answers open questions)",
+    handler: async (args, ctx) => {
+      if (isActive()) {
+        ctx.ui.notify(
+          "A planning session is already active. Use /ralplan:cancel to end it first.",
+          "info",
+        );
+        return;
+      }
+
+      const idea = args.trim() || "Implement the requested feature";
+      const config = resolvePipelineConfig();
+      const tracking = buildPipelineTracking(config);
+
+      if (
+        tracking.currentStageIndex >= 0 &&
+        tracking.currentStageIndex < tracking.stages.length
+      ) {
+        tracking.stages[tracking.currentStageIndex].status = "active";
+        tracking.stages[tracking.currentStageIndex].startedAt =
+          new Date().toISOString();
+      }
+
+      state = buildDefaultState(idea, tracking, undefined, "brainstorm", sessionCwd);
+      persistState();
+      updateUI(ctx);
+
+      ctx.ui.notify(`BRAINSTORM started: ${idea}`, "info");
+
+      const context = buildContext();
+      if (context) {
+        const adapter = getCurrentStageAdapter(tracking);
+        if (adapter) {
+          const prompt = adapter.getPrompt(context);
+          pi.sendMessage(
+            {
+              customType: "brainstorm-start",
+              content: `## BRAINSTORM Pipeline Started
 
 Idea: ${idea}
 Stages: ${tracking.stages
@@ -252,7 +389,10 @@ ${prompt}`,
 
       const status = getPipelineStatus(state.pipeline);
       const lines = formatPipelineHUD(state.pipeline);
-      const msg = `**RALPLAN Status**\n\nProgress: ${status.progress}\n\n${lines.join("\n")}`;
+      const modeLine = state.mode === "brainstorm"
+        ? `\nMode: Brainstorm (${state.brainstorm?.subPhase ?? "unknown"})`
+        : "";
+      const msg = `**RALPLAN Status**\n\nProgress: ${status.progress}${modeLine}\n\n${lines.join("\n")}`;
       ctx.ui.notify(msg, "info");
     },
   });
@@ -314,6 +454,86 @@ ${prompt}`,
           {
             customType: "ralplan-skip",
             content: `${getTransitionPrompt(stages[currentStageIndex].id, result.adapter.id)}\n\n${prompt}`,
+            display: true,
+          },
+          { triggerTurn: true, deliverAs: "steer" },
+        );
+      }
+    },
+  });
+
+  pi.registerCommand("ralplan:done-answering", {
+    description: "Signal that you're done answering brainstorm questions",
+    handler: async (_args, ctx) => {
+      if (!isActive() || !state) {
+        ctx.ui.notify("No active session.", "info");
+        return;
+      }
+
+      if (state.mode !== "brainstorm" || state.brainstorm?.subPhase !== "awaiting-answers") {
+        ctx.ui.notify("Not currently awaiting answers.", "info");
+        return;
+      }
+
+      // Transition to planning
+      state.brainstorm = doneAnswering(state.brainstorm);
+      persistState();
+      updateUI(ctx);
+
+      // Trigger next turn with resume prompt
+      const context = buildContext();
+      if (context) {
+        pi.sendMessage(
+          {
+            customType: "brainstorm-done",
+            content: getBrainstormResumePrompt(context),
+            display: true,
+          },
+          { triggerTurn: true, deliverAs: "steer" },
+        );
+      }
+    },
+  });
+
+  pi.registerCommand("ralplan:skip-questions", {
+    description: "Skip brainstorm open questions and proceed to planning (escape hatch)",
+    handler: async (_args, ctx) => {
+      if (!isActive() || !state) {
+        ctx.ui.notify("No active session.", "info");
+        return;
+      }
+
+      if (state.mode !== "brainstorm") {
+        ctx.ui.notify("Not in brainstorm mode.", "info");
+        return;
+      }
+
+      const sub = state.brainstorm?.subPhase;
+      if (sub !== "expanding" && sub !== "awaiting-answers") {
+        ctx.ui.notify("Not currently in a phase with open questions.", "info");
+        return;
+      }
+
+      // Skip questions — works from both expanding and awaiting-answers
+      state.brainstorm = skipQuestions(state.brainstorm!);
+
+      // Write sentinel to answers.md
+      if (state.answersPath) {
+        appendArtifact(sessionCwd, "answers.md",
+          "\n## Skipped — User declined to answer open questions. Proceeding with best-effort planning.\n",
+        );
+      }
+
+      persistState();
+      updateUI(ctx);
+
+      // Trigger next turn with resume prompt
+      const context = buildContext();
+      if (context) {
+        pi.sendMessage(
+          {
+            customType: "brainstorm-skip-questions",
+            content: getBrainstormResumePrompt(context),
             display: true,
           },
           { triggerTurn: true, deliverAs: "steer" },
@@ -515,11 +735,32 @@ ${prompt}`,
   // EVENT HANDLERS
   // ==========================================================================
 
-  // Detect /ralplan or keyword in user input
+  // Detect user input — handle answer accumulation and broad-request gate
   pi.on("input", async (event, ctx) => {
     if (event.source === "extension") return { action: "continue" };
 
     const text = event.text.trim();
+
+    // Brainstorm answer accumulation during awaiting-answers
+    if (isActive() && isBrainstormMode(state) && isAwaitingAnswers(state?.brainstorm)) {
+      const result = processBrainstormInput(state!, text);
+      // Append answer to state
+      state!.brainstorm = appendAnswer(state!.brainstorm!, result.appendAnswer.question, result.appendAnswer.answer);
+      // Append answer to answers.md on disk
+      if (state!.answersPath) {
+        try {
+          appendArtifact(sessionCwd, "answers.md",
+            `\n### Q: ${result.appendAnswer.question}\n${result.appendAnswer.answer}\n`,
+          );
+        } catch {
+          // File I/O failure — state is still updated in-memory
+        }
+      }
+      persistState();
+      updateUI(ctx);
+      // Stay in awaiting-answers — do NOT transition to planning
+      return { action: "continue" };
+    }
 
     // Ralplan-first gate: if user makes a broad request and no active session,
     // suggest ralplan first. Skip if explicitly bypassed.
@@ -535,13 +776,23 @@ ${prompt}`,
 
   // Inject stage prompt before agent starts
   pi.on("before_agent_start", async (event, ctx) => {
-    // Auto-start from --ralplan flag on first prompt
-    if (!isActive() && pi.getFlag("ralplan") === true && !autoStartedFromFlag) {
-      autoStartedFromFlag = true;
-      const idea = event.prompt.trim() || "Implement the requested feature";
+    // Auto-start from --ralplan or --brainstorm flag on first prompt
+    if (!isActive() && autoStartMode === null) {
+      if (pi.getFlag("ralplan") === true) {
+        autoStartMode = "ralplan";
+      } else if (pi.getFlag("brainstorm") === true) {
+        autoStartMode = "brainstorm";
+      }
+    }
 
+    if (!isActive() && autoStartMode !== null) {
+      const mode = autoStartMode;
+      autoStartMode = null; // Only auto-start once
+
+      const idea = event.prompt.trim() || "Implement the requested feature";
       const config = resolvePipelineConfig();
       const tracking = buildPipelineTracking(config);
+
       if (
         tracking.currentStageIndex >= 0 &&
         tracking.currentStageIndex < tracking.stages.length
@@ -551,10 +802,12 @@ ${prompt}`,
           new Date().toISOString();
       }
 
-      state = buildDefaultState(idea, tracking, undefined);
+      state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
       persistState();
       updateUI(ctx);
-      ctx.ui.notify(`RALPLAN started (via --ralplan): ${idea}`, "info");
+
+      const label = mode === "brainstorm" ? "BRAINSTORM" : "RALPLAN";
+      ctx.ui.notify(`${label} started (via --${mode}): ${idea}`, "info");
       // Continue to inject the stage prompt below
     }
 
@@ -565,6 +818,18 @@ ${prompt}`,
 
     const context = buildContext();
     if (!context) return;
+
+    // During brainstorm awaiting-answers, inject steering prompt
+    // (This keeps the AI from going off-track during answer collection)
+    if (state.mode === "brainstorm" && state.brainstorm?.subPhase === "awaiting-answers") {
+      return {
+        message: {
+          customType: "brainstorm-steering",
+          content: getBrainstormSteeringPrompt(),
+          display: false,
+        },
+      };
+    }
 
     const prompt = adapter.getPrompt(context);
 
@@ -598,6 +863,84 @@ ${prompt}`,
     const lastText = getLastAssistantText(event.messages);
     if (!lastText) return;
 
+    // === BRAINSTORM SIGNAL ROUTING ===
+    if (state.mode === "brainstorm" && currentStage.id === "ralplan") {
+      // Use shouldSuppressSignals for consistent signal suppression
+      if (shouldSuppressSignals(state)) {
+        const sub = state.brainstorm?.subPhase;
+
+        // expanding sub-phase: check for OPEN_QUESTIONS_READY
+        if (sub === "expanding") {
+          if (detectBrainstormSignal(lastText, BRAINSTORM_OPEN_QUESTIONS_READY)) {
+            // Parse questions from open-questions.md
+            const questionsPath = resolveOpenQuestionsPath(sessionCwd);
+            let questions: string[] = [];
+            try {
+              const content = readFileSync(questionsPath, "utf-8");
+              questions = parseOpenQuestions(content);
+            } catch {
+              ctx.ui.notify("Warning: Could not read open questions file. Proceeding with empty list.", "warn");
+            }
+
+            // Handle empty questions: auto-transition to planning
+            if (questions.length === 0) {
+              ctx.ui.notify("No open questions found. Proceeding directly to planning.", "warn");
+              state.brainstorm = transitionSubPhase(state.brainstorm!, "planning");
+              persistState();
+              updateUI(ctx);
+
+              const context = buildContext();
+              if (context) {
+                pi.sendMessage(
+                  {
+                    customType: "brainstorm-auto-plan",
+                    content: getBrainstormResumePrompt(context),
+                    display: true,
+                  },
+                  { triggerTurn: true, deliverAs: "steer" },
+                );
+              }
+              return;
+            }
+
+            // Transition to awaiting-answers
+            state.brainstorm = withQuestions(
+              transitionSubPhase(state.brainstorm!, "awaiting-answers"),
+              questions,
+            );
+            persistState();
+            updateUI(ctx);
+
+            // Send awaiting prompt to user
+            pi.sendMessage(
+              {
+                customType: "brainstorm-awaiting",
+                content: getBrainstormAwaitingPrompt(questions),
+                display: true,
+              },
+              { triggerTurn: false, deliverAs: "followUp" },
+            );
+            return;
+          }
+          // Other signals suppressed during expanding
+          return;
+        }
+
+        // awaiting-answers: total signal suppression
+        return;
+      }
+
+      // planning sub-phase: allow normal PIPELINE_RALPLAN_COMPLETE detection
+      if (state.brainstorm?.subPhase === "planning") {
+        if (detectSignal(lastText, currentStage.id)) {
+          // Fall through to existing advancement logic below
+        } else {
+          return;
+        }
+      }
+    }
+
+    // === EXISTING SIGNAL DETECTION (non-brainstorm or brainstorm planning) ===
     if (detectSignal(lastText, currentStage.id)) {
       lastAdvancedEntryId = currentEntryId;
       const currentId = currentStage.id;
@@ -658,11 +1001,21 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
   pi.on("session_start", async (_event, ctx) => {
     reconstructFromSession(ctx);
     updateUI(ctx);
+
+    // Notify user if resuming an awaiting-answers brainstorm session
+    if (state?.mode === "brainstorm" && state.brainstorm?.subPhase === "awaiting-answers") {
+      ctx.ui.notify("🧠 Brainstorm session resumed. Awaiting your answers.", "info");
+    }
   });
 
   pi.on("session_tree", async (_event, ctx) => {
     reconstructFromSession(ctx);
     updateUI(ctx);
+
+    // Notify user if resuming an awaiting-answers brainstorm session
+    if (state?.mode === "brainstorm" && state.brainstorm?.subPhase === "awaiting-answers") {
+      ctx.ui.notify("🧠 Brainstorm session resumed. Awaiting your answers.", "info");
+    }
   });
 
   // Handle turn_end for iteration counting

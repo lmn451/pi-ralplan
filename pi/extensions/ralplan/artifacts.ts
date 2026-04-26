@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { ensureRalplanDir, resolvePlansDir } from "./utils.js";
 
@@ -31,7 +31,7 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function getSectionContent(markdown: string, heading: string): string | null {
+export function getSectionContent(markdown: string, heading: string): string | null {
   const headingRe = new RegExp(`^##\\s+${escapeRegex(heading)}[ \\t]*$`, "im");
   const headingMatch = headingRe.exec(markdown);
   if (!headingMatch || headingMatch.index === undefined) return null;
@@ -123,5 +123,17 @@ export function writeArtifact(
   const dir = ensureRalplanDir(cwd);
   const path = join(dir, filename);
   writeFileSync(path, content, "utf-8");
+  return path;
+}
+
+/** Append content to an artifact file in the plans directory */
+export function appendArtifact(
+  cwd: string,
+  filename: string,
+  content: string,
+): string {
+  const dir = ensureRalplanDir(cwd);
+  const path = join(dir, filename);
+  appendFileSync(path, content, "utf-8");
   return path;
 }

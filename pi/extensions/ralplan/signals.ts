@@ -7,9 +7,18 @@ export const STAGE_SIGNALS: Record<PipelineStageId, string> = {
   qa: "PIPELINE_QA_COMPLETE",
 };
 
+/** Brainstorm-specific signals */
+export const BRAINSTORM_OPEN_QUESTIONS_READY = "BRAINSTORM_OPEN_QUESTIONS_READY";
+
 /** Detect if a completion signal is present in text for a given stage */
 export function detectSignal(text: string, stageId: PipelineStageId): boolean {
   const signal = STAGE_SIGNALS[stageId];
+  if (!signal) return false;
+  return text.includes(signal);
+}
+
+/** Detect if a brainstorm-specific signal is present in text */
+export function detectBrainstormSignal(text: string, signal: string): boolean {
   if (!signal) return false;
   return text.includes(signal);
 }

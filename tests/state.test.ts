@@ -35,7 +35,7 @@ describe("readRalplanStateFile", () => {
     expect(read!.originalIdea).toBe("test idea");
     expect(read!.active).toBe(true);
     expect(read!.sessionId).toBe("session-123");
-    expect(read!.version).toBe(1);
+    expect(read!.version).toBe(2);
   });
 
   it("returns null for invalid json", () => {
@@ -76,12 +76,43 @@ describe("buildDefaultState", () => {
   it("builds state with correct defaults", () => {
     const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
     const state = buildDefaultState("my idea", pipeline, "s1");
-    expect(state.version).toBe(1);
+    expect(state.version).toBe(2);
     expect(state.active).toBe(true);
     expect(state.originalIdea).toBe("my idea");
+    expect(state.mode).toBe("ralplan");
     expect(state.specPath).toBe(".pi/ralplan/plans/spec.md");
     expect(state.planPath).toBe(".pi/ralplan/plans/plan.md");
     expect(state.sessionId).toBe("s1");
     expect(state.startedAt).toBeDefined();
+  });
+
+  it("builds state with brainstorm mode", () => {
+    const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
+    const state = buildDefaultState("idea", pipeline, undefined, "brainstorm", tempDir);
+    expect(state.version).toBe(2);
+    expect(state.mode).toBe("brainstorm");
+    expect(state.brainstorm).toBeDefined();
+    expect(state.brainstorm?.subPhase).toBe("expanding");
+    expect(state.answersPath).toBeDefined();
+  });
+
+  it("migrates v1 state to v2", () => {
+    const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
+    const v1State = {
+      version: 1,
+      active: true,
+      pipeline: pipeline,
+      originalIdea: "test v1",
+      specPath: ".pi/ralplan/plans/spec.md",
+      planPath: ".pi/ralplan/plans/plan.md",
+      startedAt: new Date().toISOString(),
+    };
+    mkdirSync(join(tempDir, ".pi", "ralplan"), { recursive: true });
+    writeFileSync(join(tempDir, ".pi", "ralplan", "state.json"), JSON.stringify(v1State, null, 2), "utf-8");
+    const read = readRalplanStateFile(tempDir);
+    expect(read).not.toBeNull();
+    expect(read!.version).toBe(2);
+    expect(read!.mode).toBe("ralplan");
+    expect(read!.brainstorm).toBeUndefined();
   });
 });

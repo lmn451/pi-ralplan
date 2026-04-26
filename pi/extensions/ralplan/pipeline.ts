@@ -39,7 +39,10 @@ export interface PipelineContext {
   specPath?: string;
   planPath?: string;
   openQuestionsPath?: string;
+  answersPath?: string;
   config: PipelineConfig;
+  mode?: "ralplan" | "brainstorm";
+  brainstorm?: import("./brainstorm.js").BrainstormState;
 }
 
 export interface PipelineStageState {

@@ -1,5 +1,7 @@
 import { escapeForPrompt, resolvePlansDir } from "./utils.js";
 import type { PipelineContext } from "./pipeline.js";
+import { BRAINSTORM_OPEN_QUESTIONS_READY } from "./signals.js";
+import { formatAnswersForPrompt, sanitizeForPrompt } from "./brainstorm.js";
 
 export const RALPLAN_COMPLETION_SIGNAL = "PIPELINE_RALPLAN_COMPLETE";
 export const EXECUTION_COMPLETION_SIGNAL = "PIPELINE_EXECUTION_COMPLETE";
@@ -61,7 +63,7 @@ Output as structured markdown."
 
 ### Step 2.5: Persist Open Questions
 
-If the Analyst output includes a \`### Open Questions\` section, extract those items and save them to \`.pi/ralplan/plans/open-questions.md\` using the standard format:
+If the Analyst output includes a \`## Open Questions\` section, extract those items and save them to \`.pi/ralplan/plans/open-questions.md\` using the standard format:
 
 \`\`\`
 ## [Topic] - [Date]
@@ -395,6 +397,95 @@ Use the \`/skill:ralplan\` skill for detailed consensus workflow instructions.
 When both the spec AND the consensus plan are complete and approved:
 
 Signal: ${RALPLAN_COMPLETION_SIGNAL}`;
+}
+
+/** Generate the brainstorm expansion prompt (expanding sub-phase) */
+export function getBrainstormExpansionPrompt(context: PipelineContext): string {
+  const specPath = context.specPath || ".pi/ralplan/plans/spec.md";
+  const openQuestionsPath = context.openQuestionsPath || ".pi/ralplan/plans/open-questions.md";
+
+  return `## BRAINSTORM — Idea Expansion
+
+Your task: Expand the idea into requirements and identify **open questions** that only the user can answer.
+
+**Original Idea:** "${escapeForPrompt(context.idea)}"
+
+### Step 1: Requirements Analysis
+Spawn an Analyst subagent to extract functional and non-functional requirements.
+
+### Step 2: Identify Open Questions
+The Analyst MUST produce a \`## Open Questions\` section. For each question:
+- Why it matters
+- What decision is blocked until answered
+
+### Step 3: Persist Questions
+Save the open questions to: \`${openQuestionsPath}\` using this format:
+
+\`\`\`markdown
+## Open Questions — Date
+- [ ] **Q:** [Question text]
+  **Why:** [Why it matters]
+\`\`\`
+
+### Step 4: Signal
+When questions are saved, output exactly:
+${BRAINSTORM_OPEN_QUESTIONS_READY}
+
+**IMPORTANT:** Do NOT proceed to consensus planning. Do NOT answer the open questions yourself. Stop and wait for the user.
+`;
+}
+
+/** Generate the brainstorm steering prompt (awaiting-answers sub-phase) */
+export function getBrainstormSteeringPrompt(): string {
+  return `## Brainstorm: Awaiting User Answers
+
+The user is answering brainstorm questions. Acknowledge their response briefly. Do NOT implement, plan, or take action. Wait for the user to use /ralplan:done-answering to proceed, or /ralplan:skip-questions to skip.`;
+}
+
+/** Generate the brainstorm resume prompt (planning sub-phase) */
+export function getBrainstormResumePrompt(context: PipelineContext): string {
+  const specPath = context.specPath || ".pi/ralplan/plans/spec.md";
+  const planPath = context.planPath || ".pi/ralplan/plans/plan.md";
+  const answersBlock = context.brainstorm
+    ? formatAnswersForPrompt(context.brainstorm.answers)
+    : "";
+
+  return `## BRAINSTORM — Continue Planning
+
+The user has provided answers to the open questions.
+
+**Original Idea:** "${escapeForPrompt(context.idea)}"
+
+${answersBlock || "No specific answers were provided. Proceed with best-effort planning."}
+
+### Your Task
+1. Read the answers above.
+2. Continue expanding the idea into a full spec at \`${specPath}\`.
+3. Proceed with consensus planning (Planner → Architect → Critic).
+4. Save the plan to: \`${planPath}\`
+
+### Completion
+When both the spec AND the consensus plan are complete and approved:
+
+Signal: PIPELINE_RALPLAN_COMPLETE`;
+}
+
+/** Generate the brainstorm awaiting prompt (user-facing, not an AI prompt) */
+export function getBrainstormAwaitingPrompt(questions: string[]): string {
+  const questionList = questions
+    .map((q, i) => `${i + 1}. **${q}**`)
+    .join("\n");
+
+  return `## 🧠 Brainstorm — Awaiting Your Input
+
+I've identified some open questions to help me plan better:
+
+${questionList}
+
+Please reply with your answers naturally. You can answer all at once or in separate messages.
+
+When you're done answering, use /ralplan:done-answering to proceed to planning.
+If you'd like to skip the questions, use /ralplan:skip-questions.`;
 }
 
 /** Generate a stage transition prompt */
