@@ -1,0 +1,4 @@
+# Pi runtime state, generated plans, and drafts
+.pi/ralplan/state.json
+.pi/ralplan/plans/*.md
+.pi/ralplan/drafts/
