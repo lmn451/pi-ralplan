@@ -129,6 +129,34 @@ export function buildPipelineTracking(config: PipelineConfig): PipelineTracking 
   };
 }
 
+export function syncTrackingToConfig(tracking: PipelineTracking): PipelineTracking {
+  const { stages, currentStageIndex, pipelineConfig } = tracking;
+
+  for (let i = 0; i < stages.length; i++) {
+    if (i <= currentStageIndex) continue;
+
+    const stage = stages[i];
+    if (stage.status === "complete" || stage.status === "failed" || stage.status === "active") {
+      continue;
+    }
+
+    const adapter = getAdapterById(stage.id);
+    const shouldSkip = adapter?.shouldSkip(pipelineConfig) ?? false;
+
+    if (shouldSkip) {
+      stage.status = "skipped";
+      stage.completedAt = nowISO();
+      continue;
+    }
+
+    stage.status = "pending";
+    stage.completedAt = undefined;
+    stage.error = undefined;
+  }
+
+  return tracking;
+}
+
 // ============================================================================
 // STAGE TRANSITIONS
 // ============================================================================

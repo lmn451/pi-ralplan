@@ -118,7 +118,7 @@ export function formatAnswersForPrompt(answers: QandA[]): string {
  *  Returns empty array on failure (graceful degradation). */
 export function parseOpenQuestions(markdown: string): string[] {
   try {
-    const headingMatch = markdown.match(/^##\s+Open Questions\b.*$/im);
+    const headingMatch = markdown.match(/^##\s+.*\bOpen Questions\b.*$/im);
     if (!headingMatch || headingMatch.index === undefined) return [];
 
     const afterHeading = markdown

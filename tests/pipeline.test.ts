@@ -12,6 +12,7 @@ import {
   formatPipelineHUD,
   getAdapterById,
   registerAdapters,
+  syncTrackingToConfig,
   DEFAULT_PIPELINE_CONFIG,
   type PipelineConfig,
   type PipelineTracking,
@@ -171,6 +172,23 @@ describe("advanceStage", () => {
     expect(result.phase).toBe("execution");
     const result2 = advanceStage(tracking);
     expect(result2.phase).toBe("qa"); // skips ralph
+  });
+
+  it("recomputes future stage statuses after mid-flight config changes", () => {
+    const tracking = buildPipelineTracking(resolvePipelineConfig());
+    tracking.stages[0].status = "active";
+
+    const result = advanceStage(tracking);
+    expect(result.phase).toBe("execution");
+
+    tracking.pipelineConfig.verification = false;
+    tracking.pipelineConfig.qa = false;
+    syncTrackingToConfig(tracking);
+
+    const result2 = advanceStage(tracking);
+    expect(result2.phase).toBe("complete");
+    expect(tracking.stages[2].status).toBe("skipped");
+    expect(tracking.stages[3].status).toBe("skipped");
   });
 
   it("returns failed phase when adapter is missing for an active stage", () => {

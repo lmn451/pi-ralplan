@@ -51,6 +51,13 @@ describe("readPlanningArtifacts", () => {
     expect(artifacts.testSpecPaths).toHaveLength(1);
   });
 
+  it("finds canonical test-spec.md", () => {
+    writeFileSync(join(plansDir, "test-spec.md"), "# Tests", "utf-8");
+    const artifacts = readPlanningArtifacts(tempDir);
+    expect(artifacts.testSpecPaths).toHaveLength(1);
+    expect(artifacts.testSpecPaths[0]).toContain("test-spec.md");
+  });
+
   it("sorts files descending by name", () => {
     writeFileSync(join(plansDir, "spec-2024-01-01.md"), "# Old", "utf-8");
     writeFileSync(join(plansDir, "spec-2024-12-31.md"), "# New", "utf-8");

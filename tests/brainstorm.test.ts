@@ -169,6 +169,13 @@ describe("parseOpenQuestions", () => {
     ]);
   });
 
+  it("extracts questions from brainstorm mode headings with a prefixed topic", () => {
+    const md = `## Brainstorm Mode - Open Questions - 2026-04-26\n\n- [ ] Synchronous ask_user tool vs. async chat replies? — Drives architecture`;
+    expect(parseOpenQuestions(md)).toEqual([
+      "Synchronous ask_user tool vs. async chat replies?",
+    ]);
+  });
+
   it("returns empty array for missing section", () => {
     const md = "No questions here";
     expect(parseOpenQuestions(md)).toEqual([]);

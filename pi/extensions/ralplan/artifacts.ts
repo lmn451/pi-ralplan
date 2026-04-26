@@ -80,7 +80,7 @@ export function readPlanningArtifacts(cwd: string): PlanningArtifacts {
       prdPaths.push(fullPath);
     } else if (entry.startsWith("plan-") || entry === "plan.md") {
       planPaths.push(fullPath);
-    } else if (entry.startsWith("test-spec-")) {
+    } else if (entry.startsWith("test-spec-") || entry === "test-spec.md") {
       testSpecPaths.push(fullPath);
     }
   }

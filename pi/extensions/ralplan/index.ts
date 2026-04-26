@@ -16,6 +16,7 @@ import {
   incrementStageIteration,
   getPipelineStatus,
   formatPipelineHUD,
+  syncTrackingToConfig,
   type PipelineTracking,
   type PipelineContext,
 } from "./pipeline.js";
@@ -720,6 +721,8 @@ ${prompt}`,
       }
 
       if (params.qa !== undefined) config.qa = params.qa;
+
+      state.pipeline = syncTrackingToConfig(state.pipeline);
 
       persistState();
       updateUI(ctx);
