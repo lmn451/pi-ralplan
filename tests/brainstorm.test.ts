@@ -161,6 +161,14 @@ describe("parseOpenQuestions", () => {
     expect(questions).toContain("What is the architecture?");
   });
 
+  it("extracts questions from the brainstorm prompt format", () => {
+    const md = `## Open Questions — 2026-04-26\n\n- [ ] **Q:** What is the architecture?\n  **Why:** This blocks planning.\n- [ ] **Q:** How should we handle errors?\n  **Why:** This affects the API shape.`;
+    expect(parseOpenQuestions(md)).toEqual([
+      "What is the architecture?",
+      "How should we handle errors?",
+    ]);
+  });
+
   it("returns empty array for missing section", () => {
     const md = "No questions here";
     expect(parseOpenQuestions(md)).toEqual([]);

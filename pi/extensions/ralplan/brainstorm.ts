@@ -1,5 +1,4 @@
 import type { RalplanState } from "./state.js";
-import { getSectionContent } from "./artifacts.js";
 
 // ============================================================================
 // TYPES
@@ -115,27 +114,33 @@ export function formatAnswersForPrompt(answers: QandA[]): string {
 // ============================================================================
 
 /** Parse open questions from markdown content.
- *  Uses getSectionContent from artifacts.ts.
+ *  Accepts both the simple test format and the brainstorm prompt format.
  *  Returns empty array on failure (graceful degradation). */
 export function parseOpenQuestions(markdown: string): string[] {
   try {
-    const section = getSectionContent(markdown, "Open Questions");
+    const headingMatch = markdown.match(/^##\s+Open Questions\b.*$/im);
+    if (!headingMatch || headingMatch.index === undefined) return [];
+
+    const afterHeading = markdown
+      .slice(headingMatch.index + headingMatch[0].length)
+      .replace(/^\r?\n/, "");
+    const nextHeadingIndex = afterHeading.search(/\r?\n##\s+/);
+    const section = (nextHeadingIndex >= 0
+      ? afterHeading.slice(0, nextHeadingIndex)
+      : afterHeading).trim();
     if (!section) return [];
 
-    const questions: string[] = [];
-    const lines = section.split("\n");
-    for (const line of lines) {
-      const match = line.match(/^-\s*\[?\s*\]?\s*\*{0,2}([^*]+)\*{0,2}\s*$/);
-      if (match && match[1].trim()) {
-        questions.push(match[1].trim());
-      }
-      // Also match numbered list items
-      const numMatch = line.match(/^\d+\.\s+(.+)/);
-      if (numMatch && numMatch[1].trim()) {
-        questions.push(numMatch[1].trim());
-      }
-    }
-    return questions;
+    return section
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => /^(?:-|\*|\d+\.)\s+/.test(line))
+      .filter((line) => !/^[-*]\s*\*\*Why:\*\*/i.test(line))
+      .map((line) => line.replace(/^(?:-|\*|\d+\.)\s*/, ""))
+      .map((line) => line.replace(/^\[[ xX]?\]\s*/, ""))
+      .map((line) => line.replace(/^\*\*Q:\*\*\s*/i, ""))
+      .map((line) => line.replace(/\s+—\s+.*$/, ""))
+      .map((line) => line.trim())
+      .filter(Boolean);
   } catch {
     return [];
   }
