@@ -2,13 +2,28 @@
   "name": "pi-ralplan",
   "version": "0.1.0",
   "description": "Consensus-driven planning extension for Pi",
+  "main": "pi/skills/ralplan/SKILL.md",
+  "type": "module",
   "keywords": [
     "pi-package",
     "ralplan",
     "planning",
     "consensus"
   ],
-  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lmn451/pi-ralplan"
+  },
+  "homepage": "https://github.com/lmn451/pi-ralplan#readme",
+  "bugs": {
+    "url": "https://github.com/lmn451/pi-ralplan/issues"
+  },
+  "files": [
+    "pi/",
+    "LICENSE",
+    "README.md"
+  ],
   "pi": {
     "extensions": [
       "./pi/extensions/ralplan"
