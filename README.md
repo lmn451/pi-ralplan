@@ -1,5 +1,10 @@
 # pi-ralplan
 
+[![npm](https://img.shields.io/npm/v/pi-ralplan?label=npm)](https://npmjs.com/package/pi-ralplan) [![GitHub](https://img.shields.io/github/v/tag/lmn451/pi-ralplan?label=github)](https://github.com/lmn451/pi-ralplan)
+
+> **Note:** The `docs/` folder is managed by the [`pi-docs`](https://github.com/lmn451/pi-docs) package.
+> **Best with pi-subagentura:** Works better when paired with the `pi-subagentura` package for spawning sub-agents.
+
 Consensus-driven planning extension for [Pi](https://pi.dev). Brings the RALPLAN pipeline from oh-my-claudecode to Pi as an extension + skill package.
 
 ## Features
@@ -18,7 +23,7 @@ Consensus-driven planning extension for [Pi](https://pi.dev). Brings the RALPLAN
 ### As a Pi package
 
 ```bash
-pi install git:github.com/yourusername/pi-ralplan
+pi install npm:pi-ralplan
 ```
 
 Or for local development:
@@ -57,21 +62,21 @@ pi --ralplan "build me a todo app"
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `/ralplan [idea]` | Start consensus planning |
-| `/ralplan:status` | Show pipeline status |
-| `/ralplan:cancel` | Cancel active session |
-| `/ralplan:skip` | Skip current stage |
-| `/ralplan:artifacts` | List planning artifacts |
+| Command              | Description              |
+| -------------------- | ------------------------ |
+| `/ralplan [idea]`    | Start consensus planning |
+| `/ralplan:status`    | Show pipeline status     |
+| `/ralplan:cancel`    | Cancel active session    |
+| `/ralplan:skip`      | Skip current stage       |
+| `/ralplan:artifacts` | List planning artifacts  |
 
 ### Tools (callable by LLM)
 
-| Tool | Description |
-|------|-------------|
-| `ralplan_advance` | Advance to next stage |
+| Tool                      | Description              |
+| ------------------------- | ------------------------ |
+| `ralplan_advance`         | Advance to next stage    |
 | `ralplan_submit_artifact` | Save spec/plan/test-spec |
-| `ralplan_set_config` | Modify pipeline config |
+| `ralplan_set_config`      | Modify pipeline config   |
 
 ### Pipeline Stages
 
@@ -107,12 +112,12 @@ Add to `.pi/settings.json`:
 }
 ```
 
-| Option | Values | Description |
-|--------|--------|-------------|
-| `planning` | `"ralplan"`, `"direct"`, `false` | Planning mode or skip |
-| `execution` | `"solo"`, `"team"` | Sequential or parallel execution |
-| `verification` | `{ engine: "ralph", maxIterations: n }`, `false` | Verification settings |
-| `qa` | `true`, `false` | Enable QA stage |
+| Option         | Values                                           | Description                      |
+| -------------- | ------------------------------------------------ | -------------------------------- |
+| `planning`     | `"ralplan"`, `"direct"`, `false`                 | Planning mode or skip            |
+| `execution`    | `"solo"`, `"team"`                               | Sequential or parallel execution |
+| `verification` | `{ engine: "ralph", maxIterations: n }`, `false` | Verification settings            |
+| `qa`           | `true`, `false`                                  | Enable QA stage                  |
 
 ## Pre-Execution Gate
 
@@ -164,14 +169,14 @@ pi/skills/ralplan/
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Gate fires on well-specified prompt | Add a file reference, function name, or issue number |
-| Want to bypass the gate | Prefix with `force:` or `!` |
-| Signal not detected | Ensure the exact signal text appears in the assistant response |
-| State lost after `/tree` | State is branch-safe; check `/.pi/ralplan/state.json` as fallback |
-| Pipeline stuck | Use `/ralplan:skip` to skip the current stage |
-| Extension not loading | Verify paths in `package.json` `pi.extensions` and run `/reload` |
+| Issue                               | Solution                                                          |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| Gate fires on well-specified prompt | Add a file reference, function name, or issue number              |
+| Want to bypass the gate             | Prefix with `force:` or `!`                                       |
+| Signal not detected                 | Ensure the exact signal text appears in the assistant response    |
+| State lost after `/tree`            | State is branch-safe; check `/.pi/ralplan/state.json` as fallback |
+| Pipeline stuck                      | Use `/ralplan:skip` to skip the current stage                     |
+| Extension not loading               | Verify paths in `package.json` `pi.extensions` and run `/reload`  |
 
 ## Testing
 
