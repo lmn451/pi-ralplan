@@ -1,6 +1,6 @@
 {
   "name": "pi-ralplan",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Consensus-driven planning extension for Pi",
   "main": "pi/skills/ralplan/SKILL.md",
   "type": "module",
