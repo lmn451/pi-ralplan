@@ -1,56 +1,74 @@
+---
+title: "Publishing Workflow"
+keywords: [publish, release, npm, version, tag, bun, oidc, trusted publisher]
+---
+
 # Publishing pi-ralplan
 
-## Prerequisites
+## Trusted Publisher (OIDC)
 
-1. **npm token** stored as `NPM_TOKEN` secret in GitHub repo (Settings → Secrets → Actions → New secret)
+This package uses **npm trusted publishing** — no tokens needed. The GitHub Actions workflow authenticates via OIDC, which is configured at:
+
+```
+https://www.npmjs.com/package/pi-ralplan → Settings → Trusted Publisher
+```
+
+The trusted publisher entry authorizes `lmn451/pi-ralplan` with workflow `publish.yml`.
+
+## How It Works
+
+1. Push a `v*` tag → triggers the publish workflow
+2. GitHub Actions generates a short-lived OIDC token (`id-token: write`)
+3. npm verifies the OIDC claims match the trusted publisher config
+4. Package is published with provenance attestation
+
+No `NPM_TOKEN` secret, no token rotation, nothing to leak.
 
 ## Release Process
 
-### 1. Update Version
+```bash
+# 1. Edit version in package.json (e.g., 0.1.0 → 0.1.1)
 
-Update `version` in `package.json`:
-
-```json
-{
-  "version": "0.x.0"
-}
+# 2. Commit, tag, and push
+git add package.json
+git commit -m "chore: bump version to X.Y.Z"
+git tag vX.Y.Z
+git push origin master
+git push origin vX.Y.Z
 ```
 
-### 2. Create & Push Tag
+Or use `npm version`:
 
 ```bash
-git tag v0.x.0 && git push --tags
+npm version patch   # bumps version, commits, tags
+git push origin master --follow-tags
 ```
 
-The tag format `v*` triggers the publish workflow.
+## CI/CD
 
-### 3. Verify
+The `Publish` workflow triggers on `v*` tags and:
+- Sets up Bun and Node.js 24
+- Runs `bun install --frozen-lockfile`
+- Verifies tag matches `package.json` version
+- Runs `bun test`
+- Publishes to npm with provenance via OIDC
 
-- Check GitHub Actions tab for the workflow run
-- Verify tag version matches package.json version (workflow auto-checks this)
-- Package appears on npm within minutes
+Monitor: https://github.com/lmn451/pi-ralplan/actions
 
-## Workflow Steps
+## Manual Publish (first time only)
 
-1. Checkout code
-2. Setup pnpm
-3. Install dependencies
-4. Verify tag matches package version
-5. Run tests
-6. Verify package can be packed
-7. Publish to npm with provenance
-
-## Manual Publish (if needed)
+OIDC only works after the package exists on npm. For the initial publish:
 
 ```bash
-pnpm install
+npm login
 npm publish --access public
 ```
+
+After that, configure the trusted publisher and all future releases go through CI.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Workflow fails | Check `NODE_AUTH_TOKEN` secret is set |
-| Version mismatch | Ensure tag and package.json match |
-| Peer deps missing | Install peer deps locally first |
+| 404 on publish | Verify trusted publisher config on npmjs.com matches exactly |
+| Workflow didn't run | Ensure tag matches `v*` and was pushed to remote |
