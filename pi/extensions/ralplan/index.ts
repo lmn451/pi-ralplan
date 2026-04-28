@@ -915,14 +915,19 @@ ${prompt}`,
             updateUI(ctx);
 
             // Send awaiting prompt to user
-            pi.sendMessage(
-              {
-                customType: "brainstorm-awaiting",
-                content: getBrainstormAwaitingPrompt(questions),
-                display: true,
-              },
-              { triggerTurn: false, deliverAs: "followUp" },
-            );
+            // Defer via setTimeout to escape agent_end phase where isStreaming
+            // is still true — without this the message goes to the dead followUpQueue
+            // and only appears on the NEXT user prompt.
+            setTimeout(() => {
+              pi.sendMessage(
+                {
+                  customType: "brainstorm-awaiting",
+                  content: getBrainstormAwaitingPrompt(questions),
+                  display: true,
+                },
+                { triggerTurn: false },
+              );
+            }, 0);
             return;
           }
           // Other signals suppressed during expanding
@@ -958,32 +963,40 @@ ${prompt}`,
           "RALPLAN Pipeline Complete! ✓ All stages finished successfully.",
           "success",
         );
-        pi.sendMessage(
-          {
-            customType: "ralplan-complete",
-            content: `## RALPLAN Pipeline Complete! ✓
+        // Defer via setTimeout to escape agent_end phase where isStreaming
+        // is still true — without this the message goes to the dead followUpQueue
+        // and only appears on the NEXT user prompt.
+        setTimeout(() => {
+          pi.sendMessage(
+            {
+              customType: "ralplan-complete",
+              content: `## RALPLAN Pipeline Complete! ✓
 
 All stages finished successfully.`,
-            display: true,
-          },
-          { triggerTurn: false, deliverAs: "followUp" },
-        );
+              display: true,
+            },
+            { triggerTurn: false },
+          );
+        }, 0);
         deactivateState();
         updateUI(ctx);
         return;
       }
 
       if (result.phase === "failed") {
-        pi.sendMessage(
-          {
-            customType: "ralplan-failed",
-            content: `## RALPLAN Pipeline Failed
+        // Defer via setTimeout to escape agent_end phase — same fix as ralplan-complete.
+        setTimeout(() => {
+          pi.sendMessage(
+            {
+              customType: "ralplan-failed",
+              content: `## RALPLAN Pipeline Failed
 
 Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
-            display: true,
-          },
-          { triggerTurn: false, deliverAs: "followUp" },
-        );
+              display: true,
+            },
+            { triggerTurn: false },
+          );
+        }, 0);
         deactivateState();
         updateUI(ctx);
         return;
@@ -992,10 +1005,13 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
       const pipelineContext = buildContext();
       if (pipelineContext && result.adapter) {
         const prompt = result.adapter.getPrompt(pipelineContext);
-        pi.sendUserMessage(
-          `${getTransitionPrompt(currentId, result.adapter.id)}\n\n${prompt}`,
-          { deliverAs: "followUp" },
-        );
+        const transitionText = `${getTransitionPrompt(currentId, result.adapter.id)}\n\n${prompt}`;
+        // Defer via setTimeout to escape agent_end phase where isStreaming
+        // is still true — without this the transition goes to the dead followUpQueue
+        // and the next stage never starts until the user sends a message.
+        setTimeout(() => {
+          pi.sendUserMessage(transitionText);
+        }, 0);
       }
     }
   });
