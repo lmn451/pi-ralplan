@@ -22,13 +22,13 @@ You are executing a strict multi-agent state machine. Your primary goal is to pr
 
 Each step represents an independent evaluation. Use the `subagent` tool in chain mode.
 
-1. **State 1 (Planner)**: Creates or revises the plan based on the spec and previous feedback. Writes to `.pi/ralplan/drafts/plan_draft.md`.
+1. **State 1 (Planner)**: Creates or revises the plan based on the spec and previous feedback. Writes to `plan/drafts/plan_draft.md`.
 2. **State 2 (Architect)**: Reviews `plan_draft.md` for technical feasibility, design patterns, dependency graphs, and execution order. Must provide the strongest steelman antithesis.
    - _If REJECTED_: Route back to State 1 (Planner) with feedback.
    - _If APPROVED_: Proceed to State 3.
 3. **State 3 (Critic)**: Reviews the Architect-approved draft. Challenges assumptions, identifies edge cases, and verifies security/ops. Must reject shallow alternatives.
    - _If REJECTED_: Route back to State 1 (Planner) with feedback.
-   - _If APPROVED_: Consensus reached. Save to `.pi/ralplan/plans/plan.md`.
+   - _If APPROVED_: Consensus reached. Save to `plan/plans/plan.md`.
 
 ## Termination Conditions
 
@@ -38,14 +38,14 @@ Each step represents an independent evaluation. Use the `subagent` tool in chain
 
 ## Output Artifacts & Quality Gates
 
-### 1. The Specification (`.pi/ralplan/plans/spec.md`)
+### 1. The Specification (`plan/plans/spec.md`)
 
 The foundational requirements document. It MUST include:
 
 - `## Acceptance Criteria` (Testable boolean statements)
 - `## Requirement Coverage Map`
 
-### 2. The Final Plan (`.pi/ralplan/plans/plan.md`)
+### 2. The Final Plan (`plan/plans/plan.md`)
 
 The consensus-approved implementation guide. It MUST include:
 
