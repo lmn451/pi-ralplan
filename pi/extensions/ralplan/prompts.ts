@@ -13,7 +13,7 @@ export function getExpansionPrompt(
   idea: string,
   openQuestionsPath?: string,
 ): string {
-  const oqPath = openQuestionsPath || ".pi/ralplan/plans/open-questions.md";
+  const oqPath = openQuestionsPath || "plans/open-questions.md";
   return `## IDEA EXPANSION
 
 Your task: Expand this product idea into detailed requirements and technical spec.
@@ -63,7 +63,7 @@ Output as structured markdown."
 
 ### Step 2.5: Persist Open Questions
 
-If the Analyst output includes a \`## Open Questions\` section, extract those items and save them to \`.pi/ralplan/plans/open-questions.md\` using the standard format:
+If the Analyst output includes a \`## Open Questions\` section, extract those items and save them to \`plans/open-questions.md\` using the standard format:
 
 \`\`\`
 ## [Topic] - [Date]
@@ -77,7 +77,7 @@ Save to: \`${oqPath}\`
 ### Step 3: Save Combined Spec
 
 Combine Analyst requirements + Architect technical spec into a single document.
-Save to: \`.pi/ralplan/plans/spec.md\`
+Save to: \`plans/spec.md\`
 
 ### Step 4: Signal Completion
 
@@ -125,7 +125,7 @@ Generate a comprehensive implementation plan with:
    - Identified risks
    - Mitigation strategies
 
-Save to: .pi/ralplan/plans/plan.md
+Save to: plans/plan.md
 Signal completion with: PLAN_CREATED"
 )
 \`\`\`
@@ -139,7 +139,7 @@ Task(
   agent="critic",
   prompt="REVIEW IMPLEMENTATION PLAN
 
-Plan file: .pi/ralplan/plans/plan.md
+Plan file: plans/plan.md
 Original spec: ${specPath}
 
 Verify:
@@ -366,8 +366,8 @@ Signal: ${RALPH_COMPLETION_SIGNAL}`;
 
 /** Generate the consensus planning prompt (full ralplan mode) */
 export function getConsensusPlanningPrompt(context: PipelineContext): string {
-  const specPath = context.specPath || ".pi/ralplan/plans/spec.md";
-  const planPath = context.planPath || ".pi/ralplan/plans/plan.md";
+  const specPath = context.specPath || "plans/spec.md";
+  const planPath = context.planPath || "plans/plan.md";
 
   return `## RALPLAN (Consensus Planning)
 
@@ -401,8 +401,8 @@ Signal: ${RALPLAN_COMPLETION_SIGNAL}`;
 
 /** Generate the brainstorm expansion prompt (expanding sub-phase) */
 export function getBrainstormExpansionPrompt(context: PipelineContext): string {
-  const specPath = context.specPath || ".pi/ralplan/plans/spec.md";
-  const openQuestionsPath = context.openQuestionsPath || ".pi/ralplan/plans/open-questions.md";
+  const specPath = context.specPath || "plans/spec.md";
+  const openQuestionsPath = context.openQuestionsPath || "plans/open-questions.md";
 
   return `## BRAINSTORM — Idea Expansion
 
@@ -444,8 +444,8 @@ The user is answering brainstorm questions. Acknowledge their response briefly. 
 
 /** Generate the brainstorm resume prompt (planning sub-phase) */
 export function getBrainstormResumePrompt(context: PipelineContext): string {
-  const specPath = context.specPath || ".pi/ralplan/plans/spec.md";
-  const planPath = context.planPath || ".pi/ralplan/plans/plan.md";
+  const specPath = context.specPath || "plans/spec.md";
+  const planPath = context.planPath || "plans/plan.md";
   const answersBlock = context.brainstorm
     ? formatAnswersForPrompt(context.brainstorm.answers)
     : "";

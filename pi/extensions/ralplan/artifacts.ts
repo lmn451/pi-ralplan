@@ -55,7 +55,7 @@ function sortArtifactPathsDescending(paths: string[]): string[] {
   });
 }
 
-/** Read planning artifacts from .pi/ralplan/plans directory */
+/** Read planning artifacts from plans directory */
 export function readPlanningArtifacts(cwd: string): PlanningArtifacts {
   const plansDir = resolvePlansDir(cwd);
   const prdPaths: string[] = [];

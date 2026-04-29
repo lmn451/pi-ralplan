@@ -133,7 +133,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       sessionId: state.sessionId,
       specPath: state.specPath,
       planPath: state.planPath,
-      openQuestionsPath: ".pi/ralplan/plans/open-questions.md",
+      openQuestionsPath: "plans/open-questions.md",
       answersPath: state.answersPath,
       config: state.pipeline.pipelineConfig,
       mode: state.mode,
@@ -147,8 +147,8 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       active: state.active,
       tracking: state.pipeline,
       originalIdea: state.originalIdea,
-      specPath: state.specPath || ".pi/ralplan/plans/spec.md",
-      planPath: state.planPath || ".pi/ralplan/plans/plan.md",
+      specPath: state.specPath || "plans/spec.md",
+      planPath: state.planPath || "plans/plan.md",
       sessionId: state.sessionId,
       mode: state.mode,
       answersPath: state.answersPath,
@@ -568,7 +568,7 @@ ${prompt}`,
 
       if (parts.length === 0) {
         ctx.ui.notify(
-          "No planning artifacts found in .pi/ralplan/plans/",
+          "No planning artifacts found in plans/",
           "info",
         );
       } else {

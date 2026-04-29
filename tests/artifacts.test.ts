@@ -14,7 +14,7 @@ let plansDir: string;
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), "ralplan-artifacts-test-"));
-  plansDir = join(tempDir, ".pi", "ralplan", "plans");
+  plansDir = join(tempDir, "plans");
   mkdirSync(plansDir, { recursive: true });
 });
 

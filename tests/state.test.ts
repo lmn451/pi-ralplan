@@ -80,8 +80,8 @@ describe("buildDefaultState", () => {
     expect(state.active).toBe(true);
     expect(state.originalIdea).toBe("my idea");
     expect(state.mode).toBe("ralplan");
-    expect(state.specPath).toBe(".pi/ralplan/plans/spec.md");
-    expect(state.planPath).toBe(".pi/ralplan/plans/plan.md");
+    expect(state.specPath).toBe("plans/spec.md");
+    expect(state.planPath).toBe("plans/plan.md");
     expect(state.sessionId).toBe("s1");
     expect(state.startedAt).toBeDefined();
   });
@@ -103,8 +103,8 @@ describe("buildDefaultState", () => {
       active: true,
       pipeline: pipeline,
       originalIdea: "test v1",
-      specPath: ".pi/ralplan/plans/spec.md",
-      planPath: ".pi/ralplan/plans/plan.md",
+      specPath: "plans/spec.md",
+      planPath: "plans/plan.md",
       startedAt: new Date().toISOString(),
     };
     mkdirSync(join(tempDir, ".pi", "ralplan"), { recursive: true });

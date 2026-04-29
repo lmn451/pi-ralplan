@@ -1,21 +1,21 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-/** Ensure the ralplan directory exists */
+/** Ensure the plans directory exists */
 export function ensureRalplanDir(directory: string): string {
-  const dir = join(directory, ".pi", "ralplan", "plans");
+  const dir = join(directory, "plans");
   mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-/** Resolve the ralplan plans directory */
+/** Resolve the plans directory */
 export function resolvePlansDir(directory: string): string {
-  return join(directory, ".pi", "ralplan", "plans");
+  return join(directory, "plans");
 }
 
 /** Resolve the answers file path */
 export function resolveAnswersPath(directory: string): string {
-  return join(directory, ".pi", "ralplan", "plans", "answers.md");
+  return join(directory, "plans", "answers.md");
 }
 
 /** Resolve the ralplan state file path */
@@ -25,7 +25,7 @@ export function resolveStatePath(directory: string): string {
 
 /** Resolve the open questions file path */
 export function resolveOpenQuestionsPath(directory: string): string {
-  return join(directory, ".pi", "ralplan", "plans", "open-questions.md");
+  return join(directory, "plans", "open-questions.md");
 }
 
 /** Escape special characters for embedding in prompts */

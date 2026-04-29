@@ -81,8 +81,8 @@ export function buildDefaultState(
     mode,
     pipeline,
     originalIdea: idea,
-    specPath: ".pi/ralplan/plans/spec.md",
-    planPath: ".pi/ralplan/plans/plan.md",
+    specPath: "plans/spec.md",
+    planPath: "plans/plan.md",
     sessionId,
     startedAt: new Date().toISOString(),
   };
@@ -91,7 +91,7 @@ export function buildDefaultState(
     state.brainstorm = createBrainstormState();
     state.answersPath = directory
       ? resolveAnswersPath(directory)
-      : ".pi/ralplan/plans/answers.md";
+      : "plans/answers.md";
   }
 
   return state;

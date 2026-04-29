@@ -54,8 +54,8 @@ export const ralplanAdapter: PipelineStageAdapter = {
       return getConsensusPlanningPrompt(context);
     }
     // Direct planning mode
-    const specPath = context.specPath || ".pi/ralplan/plans/spec.md";
-    const planPath = context.planPath || ".pi/ralplan/plans/plan.md";
+    const specPath = context.specPath || "plans/spec.md";
+    const planPath = context.planPath || "plans/plan.md";
     return `## PLANNING (Direct)
 
 Your task: Expand the idea into a spec and create an implementation plan.
@@ -90,7 +90,7 @@ export const executionAdapter: PipelineStageAdapter = {
   },
 
   getPrompt(context: PipelineContext): string {
-    const planPath = context.planPath || ".pi/ralplan/plans/plan.md";
+    const planPath = context.planPath || "plans/plan.md";
     return getExecutionPrompt(planPath, context.config.execution === "team");
   },
 };
@@ -105,7 +105,7 @@ export const ralphAdapter: PipelineStageAdapter = {
   },
 
   getPrompt(context: PipelineContext): string {
-    const specPath = context.specPath || ".pi/ralplan/plans/spec.md";
+    const specPath = context.specPath || "plans/spec.md";
     const maxIterations =
       context.config.verification !== false
         ? context.config.verification.maxIterations
