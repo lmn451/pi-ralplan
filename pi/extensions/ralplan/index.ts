@@ -55,6 +55,7 @@ import {
   getDefaultArtifactFilename,
   readPlanningArtifacts,
   appendArtifact,
+  writeArtifact,
 } from "./artifacts.js";
 
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
@@ -673,7 +674,6 @@ ${prompt}`,
       ),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const { writeArtifact } = await import("./artifacts.js");
       const { ensureRalplanDir } = await import("./utils.js");
 
       ensureRalplanDir(sessionCwd);

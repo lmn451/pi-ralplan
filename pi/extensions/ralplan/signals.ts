@@ -38,7 +38,7 @@ export function getLastAssistantText(messages: Array<{ role: string; content?: u
       return msg.content
         .filter((c): c is { type: string; text?: string } => typeof c === "object" && c !== null)
         .filter((c) => c.type === "text")
-        .map((c) => c.text)
+        .map((c) => c.text ?? "")
         .join("\n");
     }
   }
