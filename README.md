@@ -181,7 +181,7 @@ pi/skills/ralplan/
 ## Testing
 
 ```bash
-bun test
+npm test
 ```
 
 ## License

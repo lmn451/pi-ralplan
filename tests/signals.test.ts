@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect } from "vitest";
 import { detectSignal, getExpectedSignal, getLastAssistantText } from "../pi/extensions/ralplan/signals.js";
 
 describe("detectSignal", () => {
