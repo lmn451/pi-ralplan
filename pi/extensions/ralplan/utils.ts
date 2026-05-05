@@ -28,6 +28,25 @@ export function resolveOpenQuestionsPath(directory: string): string {
   return join(directory, "plans", "open-questions.md");
 }
 
+/** Resolve the worktree root directory */
+export function resolveWorktreeRoot(directory: string): string {
+  return join(directory, "worktrees");
+}
+
+/** Resolve a specific worktree path */
+export function resolveWorktreePath(directory: string, name: string): string {
+  return join(resolveWorktreeRoot(directory), name);
+}
+
+/** Get default worktree config */
+export function getDefaultWorktreeConfig(directory: string): { baseBranch: string; worktreeRoot: string; createBranch: boolean } {
+  return {
+    baseBranch: "main",
+    worktreeRoot: resolveWorktreeRoot(directory),
+    createBranch: true,
+  };
+}
+
 /** Escape special characters for embedding in prompts */
 export function escapeForPrompt(text: string): string {
   return text

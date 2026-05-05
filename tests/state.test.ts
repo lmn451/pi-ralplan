@@ -35,7 +35,7 @@ describe("readRalplanStateFile", () => {
     expect(read!.originalIdea).toBe("test idea");
     expect(read!.active).toBe(true);
     expect(read!.sessionId).toBe("session-123");
-    expect(read!.version).toBe(2);
+    expect(read!.version).toBe(3);
   });
 
   it("returns null for invalid json", () => {
@@ -76,7 +76,7 @@ describe("buildDefaultState", () => {
   it("builds state with correct defaults", () => {
     const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
     const state = buildDefaultState("my idea", pipeline, "s1");
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(3);
     expect(state.active).toBe(true);
     expect(state.originalIdea).toBe("my idea");
     expect(state.mode).toBe("ralplan");
@@ -89,7 +89,7 @@ describe("buildDefaultState", () => {
   it("builds state with brainstorm mode", () => {
     const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
     const state = buildDefaultState("idea", pipeline, undefined, "brainstorm", tempDir);
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(3);
     expect(state.mode).toBe("brainstorm");
     expect(state.brainstorm).toBeDefined();
     expect(state.brainstorm?.subPhase).toBe("expanding");
@@ -111,7 +111,7 @@ describe("buildDefaultState", () => {
     writeFileSync(join(tempDir, ".pi", "ralplan", "state.json"), JSON.stringify(v1State, null, 2), "utf-8");
     const read = readRalplanStateFile(tempDir);
     expect(read).not.toBeNull();
-    expect(read!.version).toBe(2);
+    expect(read!.version).toBe(3);
     expect(read!.mode).toBe("ralplan");
     expect(read!.brainstorm).toBeUndefined();
   });

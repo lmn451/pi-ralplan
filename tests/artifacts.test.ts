@@ -99,11 +99,20 @@ describe("isPlanningComplete", () => {
   });
 });
 
+
 describe("getDefaultArtifactFilename", () => {
-  it("uses canonical filenames for stage artifacts", () => {
-    expect(getDefaultArtifactFilename("spec")).toBe("spec.md");
-    expect(getDefaultArtifactFilename("plan")).toBe("plan.md");
-    expect(getDefaultArtifactFilename("test-spec")).toBe("test-spec.md");
+  it("uses date-based filenames for stage artifacts", () => {
+    const result = getDefaultArtifactFilename("spec");
+    expect(result).toMatch(/^spec-\d{4}-\d{2}-\d{2}\.md$/);
+    const result2 = getDefaultArtifactFilename("plan");
+    expect(result2).toMatch(/^plan-\d{4}-\d{2}-\d{2}\.md$/);
+    const result3 = getDefaultArtifactFilename("test-spec");
+    expect(result3).toMatch(/^test-spec-\d{4}-\d{2}-\d{2}\.md$/);
+  });
+
+  it("uses custom description in filename", () => {
+    const result = getDefaultArtifactFilename("spec", "my-feature");
+    expect(result).toMatch(/^spec-\d{4}-\d{2}-\d{2}-my-feature\.md$/);
   });
 });
 

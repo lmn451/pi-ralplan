@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { ensureRalplanDir, resolvePlansDir } from "./utils.js";
+import { formatDate, generatePlanFilename, generateSpecFilename, sanitizeDescription } from "./naming.js";
 
 export interface PlanningArtifacts {
   specPaths: string[];
@@ -8,7 +9,31 @@ export interface PlanningArtifacts {
   testSpecPaths: string[];
 }
 
-export function getDefaultArtifactFilename(type: "spec" | "plan" | "test-spec"): string {
+/** Generate default artifact filename with date-based naming */
+export function getDefaultArtifactFilename(
+  type: "spec" | "plan" | "test-spec",
+  description?: string
+): string {
+  const date = formatDate();
+  
+  switch (type) {
+    case "spec":
+      return description 
+        ? `spec-${date}-${sanitizeDescription(description)}.md`
+        : `spec-${date}.md`;
+    case "plan":
+      return description 
+        ? `plan-${date}-${sanitizeDescription(description)}.md`
+        : `plan-${date}.md`;
+    case "test-spec":
+      return description
+        ? `test-spec-${date}-${sanitizeDescription(description)}.md`
+        : `test-spec-${date}.md`;
+  }
+}
+
+/** Legacy function for backward compatibility */
+export function getLegacyArtifactFilename(type: "spec" | "plan" | "test-spec"): string {
   switch (type) {
     case "spec":
       return "spec.md";

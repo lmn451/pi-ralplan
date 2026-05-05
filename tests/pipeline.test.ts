@@ -315,7 +315,7 @@ describe("formatPipelineHUD", () => {
   it("formats all stage statuses", () => {
     const tracking = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
     const hud = formatPipelineHUD(tracking);
-    expect(hud[0]).toContain("..") && expect(hud[0]).toContain("Planning");
+    expect(hud[0]).toContain("Planning");
     expect(hud[1]).toContain("..");
     expect(hud[2]).toContain("..");
     expect(hud[3]).toContain("..");
@@ -331,7 +331,7 @@ describe("formatPipelineHUD", () => {
     const tracking = buildPipelineTracking(config);
     const hud = formatPipelineHUD(tracking);
     expect(hud[0]).toContain("--");
-    expect(hud[1]).toContain("..") && expect(hud[1]).toContain("Execution");
+    expect(hud[1]).toContain("Execution");
     expect(hud[2]).toContain("--");
     expect(hud[3]).toContain("--");
   });

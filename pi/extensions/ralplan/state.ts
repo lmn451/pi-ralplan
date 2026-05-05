@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { resolveStatePath, resolveAnswersPath } from "./utils.js";
 import type { PipelineTracking } from "./pipeline.js";
 import type { BrainstormState } from "./brainstorm.js";
+import type { ADR } from "./adr.js";
 
 export type RalplanMode = "ralplan" | "brainstorm";
 
@@ -19,9 +20,11 @@ export interface RalplanState {
   sessionId?: string;
   startedAt: string;
   completedAt?: string;
+  worktreePath?: string;      // NEW: Associated worktree for this plan
+  adr?: ADR;                  // NEW: ADR for current plan
 }
 
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
 /** Read ralplan state from file */
 export function readRalplanStateFile(directory: string): RalplanState | null {
@@ -39,6 +42,11 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
       parsed.version = 2;
       parsed.mode = "ralplan";
       // brainstorm and answersPath are undefined — correct for v1
+    }
+    // v2 → v3 migration: add worktreePath and adr
+    if (parsed.version === 2) {
+      parsed.version = 3;
+      // worktreePath and adr will be undefined — correct for v2
     }
     return parsed as unknown as RalplanState;
   } catch {
@@ -85,6 +93,8 @@ export function buildDefaultState(
     planPath: "plans/plan.md",
     sessionId,
     startedAt: new Date().toISOString(),
+    worktreePath: undefined,  // NEW: Set after worktree creation
+    adr: undefined,            // NEW: Set after ADR creation
   };
 
   if (mode === "brainstorm") {

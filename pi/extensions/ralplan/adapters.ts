@@ -17,11 +17,90 @@ import {
   RALPH_COMPLETION_SIGNAL,
   QA_COMPLETION_SIGNAL,
 } from "./prompts.js";
+import {
+  formatDate,
+  generatePlanFilename,
+  generateSpecFilename,
+} from "./naming.js";
+import { createWorktree, type WorktreeConfig } from "./worktree.js";
+import { createADR } from "./adr.js";
 
 export { RALPLAN_COMPLETION_SIGNAL };
 export { EXECUTION_COMPLETION_SIGNAL };
 export { RALPH_COMPLETION_SIGNAL };
 export { QA_COMPLETION_SIGNAL };
+
+/** Generate worktree name from idea */
+function generateWorktreeName(idea: string): string {
+  // Sanitize and truncate for worktree name
+  const sanitized = idea
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  return sanitized || "plan";
+}
+
+/** Get worktree creation prompt section */
+function getWorktreeCreationSection(context: PipelineContext): string {
+  const worktreeName = generateWorktreeName(context.idea);
+  const worktreeRoot = context.directory 
+    ? `${context.directory}/worktrees`
+    : "./worktrees";
+
+  return `
+### Worktree Creation
+
+Before planning begins, a new Git worktree will be created for this plan.
+
+- **Worktree Name:** \`${worktreeName}\`
+- **Worktree Path:** \`${worktreeRoot}/${worktreeName}\`
+- **Base Branch:** main (configurable)
+
+The worktree isolates this plan's work from the main repository.
+`;
+}
+
+/** Get date-based filename section */
+function getDateBasedNamingSection(): string {
+  const today = formatDate();
+  return `
+### Date-Based Naming
+
+Plan and spec files use human-readable date-based filenames:
+- Spec: \`spec-${today}-{short-description}.md\`
+- Plan: \`plan-${today}-{short-description}.md\`
+
+This ensures easy navigation and historical tracking.
+`;
+}
+
+/** Get ADR template section */
+function getADRSection(): string {
+  return `
+### Architecture Decision Record (ADR)
+
+The plan artifact MUST include an ADR section with the following structure:
+
+\`\`\`markdown
+## Architecture Decision Record
+
+### Open Questions
+- [ ] **Question** — Why it matters
+
+### Decisions
+- **Decision Title** — Description [status: pending/approved/rejected]
+
+### Approvals
+- ✓ **Approved Item** by [author] at [timestamp]
+
+### Rejections
+- ✗ **Rejected Item** by [author]: [reason]
+\`\`\`
+
+Track all open questions, decisions, approvals, and rejections in this section.
+`;
+}
 
 export const ralplanAdapter: PipelineStageAdapter = {
   id: "ralplan",
@@ -30,6 +109,26 @@ export const ralplanAdapter: PipelineStageAdapter = {
 
   shouldSkip(config: PipelineConfig): boolean {
     return config.planning === false;
+  },
+
+  onEnter(context: PipelineContext): void {
+    // Create worktree when planning stage begins
+    const worktreeName = generateWorktreeName(context.idea);
+    const worktreeConfig: WorktreeConfig = {
+      baseBranch: "main",
+      worktreeRoot: context.directory 
+        ? `${context.directory}/worktrees`
+        : "./worktrees",
+      createBranch: true,
+    };
+    
+    const result = createWorktree(worktreeConfig, worktreeName);
+    if (result.success && result.path) {
+      // Worktree created - path will be stored in state by index.ts
+      console.log(`[ralplan] Worktree created: ${result.path}`);
+    } else {
+      console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
+    }
   },
 
   getPrompt(context: PipelineContext): string {
@@ -51,12 +150,27 @@ export const ralplanAdapter: PipelineStageAdapter = {
 
     // Existing ralplan mode
     if (context.config.planning === "ralplan") {
-      return getConsensusPlanningPrompt(context);
+      const basePrompt = getConsensusPlanningPrompt(context);
+      return (
+        getWorktreeCreationSection(context) +
+        getDateBasedNamingSection() +
+        getADRSection() +
+        "\n---\n\n" +
+        basePrompt
+      );
     }
+
     // Direct planning mode
     const specPath = context.specPath || "plans/spec.md";
     const planPath = context.planPath || "plans/plan.md";
-    return `## PLANNING (Direct)
+    return (
+      getWorktreeCreationSection(context) +
+      getDateBasedNamingSection() +
+      getADRSection() +
+      `
+---
+
+## PLANNING (Direct)
 
 Your task: Expand the idea into a spec and create an implementation plan.
 
@@ -76,7 +190,8 @@ Save the plan to: \`${planPath}\`
 
 When both the spec AND the plan are complete:
 
-Signal: ${RALPLAN_COMPLETION_SIGNAL}`;
+Signal: ${RALPLAN_COMPLETION_SIGNAL}`
+    );
   },
 };
 
