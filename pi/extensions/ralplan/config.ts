@@ -13,7 +13,7 @@ export interface WorktreeConfig {
   /** Whether to create a new branch for the worktree (default: true) */
   createBranch: boolean;
   /** Whether to auto-cleanup worktree on plan cancellation (default: false) */
-  autoCleanup: boolean;
+  autoCleanup?: boolean;  // Optional for backward compatibility
 }
 
 export interface NamingConfig {
@@ -52,6 +52,47 @@ export function mergeConfig(userConfig: Partial<RalplanConfig>): RalplanConfig {
   };
 }
 
+/** Safely extract string value for a given key from config content */
+function extractStringValue(content: string, key: string): string | undefined {
+  const regex = new RegExp(`${key}\\s*:\\s*"([^"]*)"`);
+  const match = content.match(regex);
+  return match ? match[1] : undefined;
+}
+
+/** Safely extract boolean value */
+function extractBooleanValue(content: string, key: string): boolean | undefined {
+  const regex = new RegExp(`${key}\\s*:\\s*(true|false)`);
+  const match = content.match(regex);
+  return match ? match[1] === 'true' : undefined;
+}
+
+/** Safe config parser - extracts worktree and naming without eval */
+export function parseConfig(content: string): { worktree: WorktreeConfig; naming: NamingConfig } | undefined {
+  // Block dangerous patterns
+  if (/\bfunction\b|\beval\b|\bexec\b|\bawait\b|\bnew\b|\bprototype\b|\bclass\b/i.test(content)) {
+    return undefined;
+  }
+  
+  const baseBranch = extractStringValue(content, 'baseBranch');
+  const worktreeRoot = extractStringValue(content, 'worktreeRoot');
+  const createBranch = extractBooleanValue(content, 'createBranch');
+  const autoCleanup = extractBooleanValue(content, 'autoCleanup');
+  const dateFormat = extractStringValue(content, 'dateFormat');
+  
+  const worktree: WorktreeConfig = { ...DEFAULT_CONFIG.worktree };
+  const naming: NamingConfig = { ...DEFAULT_CONFIG.naming };
+  
+  let changed = false;
+  
+  if (baseBranch !== undefined) { worktree.baseBranch = baseBranch; changed = true; }
+  if (worktreeRoot !== undefined) { worktree.worktreeRoot = worktreeRoot; changed = true; }
+  if (createBranch !== undefined) { worktree.createBranch = createBranch; changed = true; }
+  if (autoCleanup !== undefined) { worktree.autoCleanup = autoCleanup; changed = true; }
+  if (dateFormat !== undefined) { naming.dateFormat = dateFormat; changed = true; }
+  
+  return changed ? { worktree, naming } : undefined;
+}
+
 /** Load config from file (if exists) */
 export async function loadConfig(cwd: string): Promise<RalplanConfig> {
   try {
@@ -60,19 +101,8 @@ export async function loadConfig(cwd: string): Promise<RalplanConfig> {
     
     if (existsSync(configPath)) {
       const content = readFileSync(configPath, "utf-8");
-      // Strategy: bare eval (works for CJS module.exports + bare objects),
-      // then strip "export default" prefix and eval as expression (works for ESM)
-      // eslint-disable-next-line no-eval
-      let userConfig: Partial<RalplanConfig> | undefined;
-      try { userConfig = eval(content); } catch { /* ignore */ }
-      if (!userConfig) {
-        const stripped = content
-          .replace(/^export\s+default\s+/, "")
-          .trimEnd()
-          .replace(/;+$/, "");
-        try { userConfig = eval(`(${stripped})`); } catch { /* ignore */ }
-      }
-      return mergeConfig(userConfig ?? {});
+      const userConfig = parseConfig(content);
+      if (userConfig) return mergeConfig(userConfig);
     }
   } catch {
     // Ignore errors, use defaults

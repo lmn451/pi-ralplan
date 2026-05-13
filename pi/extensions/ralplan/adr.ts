@@ -60,20 +60,18 @@ export function createADR(): ADR {
     },
     approve(id, author) {
       const entry = entries.find((e) => e.id === id);
-      if (entry) {
-        entry.status = "approved";
-        entry.author = author;
-        entry.timestamp = new Date().toISOString();
-      }
+      if (!entry) throw new Error(`ADR entry not found: ${id}`);
+      entry.status = "approved";
+      entry.author = author;
+      entry.timestamp = new Date().toISOString();
     },
     reject(id, author, reason) {
       const entry = entries.find((e) => e.id === id);
-      if (entry) {
-        entry.status = "rejected";
-        entry.author = author;
-        entry.reason = reason;
-        entry.timestamp = new Date().toISOString();
-      }
+      if (!entry) throw new Error(`ADR entry not found: ${id}`);
+      entry.status = "rejected";
+      entry.author = author;
+      entry.reason = reason;
+      entry.timestamp = new Date().toISOString();
     },
     toMarkdown() {
       const lines = ["## Architecture Decision Record (ADR)\n"];
@@ -99,9 +97,7 @@ export function createADR(): ADR {
       if (planIterations.length > 0) {
         lines.push("### Plan Iterations\n");
         for (const p of planIterations) {
-          lines.push(`- **Iteration ${p.iteration ?? "?"}**: ${p.title}`);
-          if (p.description) lines.push(`  - ${p.description}`);
-          lines.push(`  - Status: ${p.status}`);
+          lines.push(`- **Iteration ${p.iteration}**: ${p.title}`);
         }
         lines.push("");
       }

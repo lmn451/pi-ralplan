@@ -43,6 +43,16 @@ describe("loadConfig", () => {
     expect(config.worktree.worktreeRoot).toBe("./worktrees");
   });
 
+  it("does not execute arbitrary code from config file", async () => {
+    writeFileSync(
+      join(tempDir, "ralplan.config.js"),
+      `globalThis.__cfgHacked = true; module.exports = { worktree: { baseBranch: "x" } };\n`,
+    );
+    delete (globalThis as { __cfgHacked?: boolean }).__cfgHacked;
+    await loadConfig(tempDir);
+    expect((globalThis as { __cfgHacked?: boolean }).__cfgHacked).toBeUndefined();
+  });
+
   it("merges partial config with defaults", async () => {
     writeFileSync(
       join(tempDir, "ralplan.config.js"),

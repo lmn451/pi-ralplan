@@ -57,12 +57,10 @@ describe("adr.ts", () => {
       expect(updated?.reason).toBe("Not a good idea");
     });
 
-    it("should handle approve/reject for non-existent ID gracefully", () => {
+    it("should throw on approve/reject for non-existent ID", () => {
       const adr = createADR();
-      // Should not throw
-      adr.approve("non-existent-id", "author");
-      adr.reject("non-existent-id", "author", "reason");
-      expect(adr.entries).toEqual([]);
+      expect(() => adr.approve("non-existent-id", "author")).toThrow();
+      expect(() => adr.reject("non-existent-id", "author", "reason")).toThrow();
     });
   });
 

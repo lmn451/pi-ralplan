@@ -6,11 +6,10 @@ import { execSync } from "child_process";
 import { resolve, join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 
-export interface WorktreeConfig {
-  baseBranch: string;       // Default: "main"
-  worktreeRoot: string;     // Default: "./worktrees"
-  createBranch: boolean;   // Default: true
-}
+import type { WorktreeConfig } from "./config.js";
+
+// Re-export WorktreeConfig for convenience
+export type { WorktreeConfig };
 
 export interface WorktreeResult {
   success: boolean;
@@ -58,18 +57,22 @@ export function createWorktree(config: WorktreeConfig, name: string): WorktreeRe
         // Invalid existing worktree, treat as new
       }
 
-      // Build git command
+      // Validate and sanitize baseBranch - prevents command injection
       const baseBranch = config.baseBranch || "main";
+      if (!/^[a-zA-Z0-9._\/-]+$/.test(baseBranch)) {
+        throw new Error(`Invalid baseBranch: ${baseBranch}`);
+      }
+      
+      // Build safe git commands with properly quoted arguments
       if (config.createBranch) {
-        // Create new branch for worktree
+        const branchName = `feature/${sanitizedName}`;
         execSync(
-          `git worktree add -b feature/${sanitizedName} "${worktreePath}" ${baseBranch}`,
+          `git worktree add -b "${branchName}" "${worktreePath}" "${baseBranch}"`,
           { stdio: "pipe", shell: "/bin/bash" }
         );
       } else {
-        // Use existing branch/commit
         execSync(
-          `git worktree add "${worktreePath}" ${baseBranch}`,
+          `git worktree add "${worktreePath}" "${baseBranch}"`,
           { stdio: "pipe", shell: "/bin/bash" }
         );
       }
