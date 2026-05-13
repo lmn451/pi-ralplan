@@ -76,7 +76,7 @@ export function createADR(): ADR {
       }
     },
     toMarkdown() {
-      const lines = ["## Architecture Decision Record\n"];
+      const lines = ["## Architecture Decision Record (ADR)\n"];
 
       const questions = entries.filter((e) => e.type === "open-question");
       const decisions = entries.filter((e) => e.type === "decision");

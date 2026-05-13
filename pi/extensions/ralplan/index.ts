@@ -216,7 +216,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     // Find the most recent ralplan-state entry
     const ralplanEntry = entries
       .filter(
-        (e: { type: string; customType?: string; data?: PersistedState }) =>
+        (e) =>
           e.type === "custom" && e.customType === CUSTOM_TYPE,
       )
       .pop() as { data?: PersistedState } | undefined;
@@ -435,7 +435,7 @@ ${prompt}`,
       updateUI(ctx);
 
       if (result.phase === "complete") {
-        ctx.ui.notify("RALPLAN pipeline complete!", "success");
+        ctx.ui.notify("RALPLAN pipeline complete!", "info");
         deactivateState();
         return;
       }
@@ -882,12 +882,12 @@ ${prompt}`,
               const content = readFileSync(questionsPath, "utf-8");
               questions = parseOpenQuestions(content);
             } catch {
-              ctx.ui.notify("Warning: Could not read open questions file. Proceeding with empty list.", "warn");
+              ctx.ui.notify("Warning: Could not read open questions file. Proceeding with empty list.", "warning");
             }
 
             // Handle empty questions: auto-transition to planning
             if (questions.length === 0) {
-              ctx.ui.notify("No open questions found. Proceeding directly to planning.", "warn");
+              ctx.ui.notify("No open questions found. Proceeding directly to planning.", "warning");
               state.brainstorm = transitionSubPhase(state.brainstorm!, "planning");
               persistState();
               updateUI(ctx);
@@ -961,7 +961,7 @@ ${prompt}`,
       if (result.phase === "complete") {
         ctx.ui.notify(
           "RALPLAN Pipeline Complete! ✓ All stages finished successfully.",
-          "success",
+          "info",
         );
         // Defer via setTimeout to escape agent_end phase where isStreaming
         // is still true — without this the message goes to the dead followUpQueue

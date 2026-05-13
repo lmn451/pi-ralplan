@@ -60,9 +60,19 @@ export async function loadConfig(cwd: string): Promise<RalplanConfig> {
     
     if (existsSync(configPath)) {
       const content = readFileSync(configPath, "utf-8");
-      // Simple eval for JS config file - in production use proper import
-      const userConfig = eval(`(function() { return (${content}); })()`);
-      return mergeConfig(userConfig);
+      // Strategy: bare eval (works for CJS module.exports + bare objects),
+      // then strip "export default" prefix and eval as expression (works for ESM)
+      // eslint-disable-next-line no-eval
+      let userConfig: Partial<RalplanConfig> | undefined;
+      try { userConfig = eval(content); } catch { /* ignore */ }
+      if (!userConfig) {
+        const stripped = content
+          .replace(/^export\s+default\s+/, "")
+          .trimEnd()
+          .replace(/;+$/, "");
+        try { userConfig = eval(`(${stripped})`); } catch { /* ignore */ }
+      }
+      return mergeConfig(userConfig ?? {});
     }
   } catch {
     // Ignore errors, use defaults

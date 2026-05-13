@@ -1,3 +1,4 @@
+import { getDefaultArtifactFilename } from "./artifacts.js";
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { resolveStatePath, resolveAnswersPath } from "./utils.js";
@@ -89,8 +90,8 @@ export function buildDefaultState(
     mode,
     pipeline,
     originalIdea: idea,
-    specPath: "plans/spec.md",
-    planPath: "plans/plan.md",
+    specPath: `plans/${getDefaultArtifactFilename("spec")}`,
+    planPath: `plans/${getDefaultArtifactFilename("plan")}`,
     sessionId,
     startedAt: new Date().toISOString(),
     worktreePath: undefined,  // NEW: Set after worktree creation

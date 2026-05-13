@@ -9,6 +9,7 @@ import {
   buildDefaultState,
 } from "../pi/extensions/ralplan/state.js";
 import { buildPipelineTracking, DEFAULT_PIPELINE_CONFIG } from "../pi/extensions/ralplan/pipeline.js";
+import { getDefaultArtifactFilename } from "../pi/extensions/ralplan/artifacts.js";
 
 let tempDir: string;
 
@@ -80,8 +81,8 @@ describe("buildDefaultState", () => {
     expect(state.active).toBe(true);
     expect(state.originalIdea).toBe("my idea");
     expect(state.mode).toBe("ralplan");
-    expect(state.specPath).toBe("plans/spec.md");
-    expect(state.planPath).toBe("plans/plan.md");
+    expect(state.specPath).toBe(`plans/${getDefaultArtifactFilename("spec")}`);
+    expect(state.planPath).toBe(`plans/${getDefaultArtifactFilename("plan")}`);
     expect(state.sessionId).toBe("s1");
     expect(state.startedAt).toBeDefined();
   });

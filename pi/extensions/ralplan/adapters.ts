@@ -21,8 +21,8 @@ import {
   formatDate,
   generatePlanFilename,
   generateSpecFilename,
-  resolveWorktreeRoot,
-} from "./utils.js";
+} from "./naming.js";
+import { resolveWorktreeRoot } from "./utils.js";
 import { createWorktree, type WorktreeConfig } from "./worktree.js";
 import { createADR } from "./adr.js";
 
