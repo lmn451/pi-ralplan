@@ -123,7 +123,6 @@ describe("adr.ts", () => {
         description: "Plan approved",
         status: "approved",
         author: "architect"
-        
       });
 
       const md = adr.toMarkdown();
@@ -199,6 +198,71 @@ describe("adr.ts", () => {
       expect(adr.entries.find(e => e.id === d.id)?.type).toBe("decision");
       expect(adr.entries.find(e => e.id === a.id)?.type).toBe("approval");
       expect(adr.entries.find(e => e.id === r.id)?.type).toBe("rejection");
+    });
+  });
+
+  describe("new entry types (plan-iteration, tradeoff, critic-review, architect-review)", () => {
+    it("should support plan-iteration with iteration number", () => {
+      const adr = createADR();
+      adr.addEntry({
+        type: "plan-iteration",
+        title: "Initial Plan Draft",
+        description: "First iteration through architect review",
+        status: "pending",
+        iteration: 1,
+      });
+
+      const md = adr.toMarkdown();
+      expect(md).toContain("### Plan Iterations");
+      expect(md).toContain("**Iteration 1**: Initial Plan Draft");
+    });
+
+    it("should support tradeoff with options and alternatives", () => {
+      const adr = createADR();
+      adr.addEntry({
+        type: "tradeoff",
+        title: "Database Selection",
+        description: "Chose PostgreSQL for ACID compliance",
+        status: "approved",
+        tradeoffs: ["PostgreSQL", "MongoDB", "Redis"],
+        alternatives: ["MongoDB - Rejected due to no joins", "Redis - Rejected due to persistence requirements"],
+      });
+
+      const md = adr.toMarkdown();
+      expect(md).toContain("### Tradeoffs Discussed");
+      expect(md).toContain("PostgreSQL");
+      expect(md).toContain("MongoDB");
+      expect(md).toContain("✗ MongoDB - Rejected");
+    });
+
+    it("should support critic-review with feedback", () => {
+      const adr = createADR();
+      adr.addEntry({
+        type: "critic-review",
+        title: "Plan Review Iteration 2",
+        description: "Critic identified missing error handling",
+        status: "rejected",
+        feedback: "Missing error handling for network failures. Task 5 lacks validation.",
+      });
+
+      const md = adr.toMarkdown();
+      expect(md).toContain("### Critic Reviews");
+      expect(md).toContain("Feedback: Missing error handling");
+    });
+
+    it("should support architect-review with feedback", () => {
+      const adr = createADR();
+      adr.addEntry({
+        type: "architect-review",
+        title: "Architecture Review",
+        description: "Technical feasibility check",
+        status: "approved",
+        feedback: "Design looks solid. Consider caching layer for performance.",
+      });
+
+      const md = adr.toMarkdown();
+      expect(md).toContain("### Architect Reviews");
+      expect(md).toContain("Design looks solid");
     });
   });
 });

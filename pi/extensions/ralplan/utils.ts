@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname, basename } from "node:path";
 
 /** Ensure the plans directory exists */
 export function ensureRalplanDir(directory: string): string {
@@ -28,9 +28,11 @@ export function resolveOpenQuestionsPath(directory: string): string {
   return join(directory, "plans", "open-questions.md");
 }
 
-/** Resolve the worktree root directory */
+/** Resolve the worktree root directory (sibling to repo, not inside) */
 export function resolveWorktreeRoot(directory: string): string {
-  return join(directory, "worktrees");
+  const parent = dirname(directory);
+  const name = basename(directory);
+  return join(parent, `${name}-worktrees`);
 }
 
 /** Resolve a specific worktree path */

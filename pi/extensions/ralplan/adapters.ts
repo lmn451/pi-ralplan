@@ -21,7 +21,8 @@ import {
   formatDate,
   generatePlanFilename,
   generateSpecFilename,
-} from "./naming.js";
+  resolveWorktreeRoot,
+} from "./utils.js";
 import { createWorktree, type WorktreeConfig } from "./worktree.js";
 import { createADR } from "./adr.js";
 
@@ -44,9 +45,7 @@ function generateWorktreeName(idea: string): string {
 /** Get worktree creation prompt section */
 function getWorktreeCreationSection(context: PipelineContext): string {
   const worktreeName = generateWorktreeName(context.idea);
-  const worktreeRoot = context.directory 
-    ? `${context.directory}/worktrees`
-    : "./worktrees";
+  const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
 
   return `
 ### Worktree Creation
@@ -80,13 +79,35 @@ function getADRSection(): string {
   return `
 ### Architecture Decision Record (ADR)
 
-The plan artifact MUST include an ADR section with the following structure:
+The plan artifact MUST include an ADR section that captures the full planning flow:
 
 \`\`\`markdown
 ## Architecture Decision Record
 
 ### Open Questions
 - [ ] **Question** — Why it matters
+
+### Plan Iterations
+- **Iteration N**: Title
+  - Description of architect/critic feedback
+  - Status: pending/approved/rejected
+
+### Tradeoffs Discussed
+- **Tradeoff Title**
+  - Options considered:
+    - Option A
+    - Option B
+  - Rejected alternatives:
+    - ✗ Rejected option
+  - Decision: Why this choice
+
+### Architect Reviews
+- **Review Title** [status]
+  - Feedback: Architect's technical assessment
+
+### Critic Reviews
+- **Review Title** [status]
+  - Feedback: Critic's challenge points
 
 ### Decisions
 - **Decision Title** — Description [status: pending/approved/rejected]
@@ -98,7 +119,7 @@ The plan artifact MUST include an ADR section with the following structure:
 - ✗ **Rejected Item** by [author]: [reason]
 \`\`\`
 
-Track all open questions, decisions, approvals, and rejections in this section.
+Track all iterations, tradeoffs, reviews, decisions, approvals, and rejections.
 `;
 }
 
@@ -114,14 +135,13 @@ export const ralplanAdapter: PipelineStageAdapter = {
   onEnter(context: PipelineContext): void {
     // Create worktree when planning stage begins
     const worktreeName = generateWorktreeName(context.idea);
+    const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
     const worktreeConfig: WorktreeConfig = {
       baseBranch: "main",
-      worktreeRoot: context.directory 
-        ? `${context.directory}/worktrees`
-        : "./worktrees",
+      worktreeRoot,
       createBranch: true,
     };
-    
+
     const result = createWorktree(worktreeConfig, worktreeName);
     if (result.success && result.path) {
       // Worktree created - path will be stored in state by index.ts

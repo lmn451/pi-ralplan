@@ -4,7 +4,16 @@
 
 import { randomUUID } from "node:crypto";
 
-export type ADREntryType = "open-question" | "decision" | "approval" | "rejection";
+export type ADREntryType = 
+  | "open-question" 
+  | "decision" 
+  | "approval" 
+  | "rejection"
+  | "plan-iteration"     // Track plan iterations through architect/critic
+  | "tradeoff"            // Track tradeoffs discussed
+  | "critic-review"       // Record critic review feedback
+  | "architect-review";    // Record architect review feedback
+
 export type ADRStatus = "pending" | "approved" | "rejected";
 
 export interface ADREntry {
@@ -15,7 +24,11 @@ export interface ADREntry {
   status: ADRStatus;
   author?: string;
   timestamp: string;
-  reason?: string;  // For rejections
+  reason?: string;           // For rejections
+  iteration?: number;        // For plan-iteration: iteration number
+  tradeoffs?: string[];      // For tradeoff: list of options considered
+  alternatives?: string[];   // For tradeoff: alternatives that were rejected
+  feedback?: string;         // For critic/architect reviews: the actual feedback
 }
 
 export interface ADR {
@@ -69,12 +82,69 @@ export function createADR(): ADR {
       const decisions = entries.filter((e) => e.type === "decision");
       const approvals = entries.filter((e) => e.type === "approval");
       const rejections = entries.filter((e) => e.type === "rejection");
+      const planIterations = entries.filter((e) => e.type === "plan-iteration");
+      const tradeoffs = entries.filter((e) => e.type === "tradeoff");
+      const criticReviews = entries.filter((e) => e.type === "critic-review");
+      const architectReviews = entries.filter((e) => e.type === "architect-review");
 
       if (questions.length > 0) {
         lines.push("### Open Questions\n");
         for (const q of questions) {
           const check = q.status === "pending" ? "[ ]" : "[x]";
           lines.push(`- ${check} **${q.title}** — ${q.description}`);
+        }
+        lines.push("");
+      }
+
+      if (planIterations.length > 0) {
+        lines.push("### Plan Iterations\n");
+        for (const p of planIterations) {
+          lines.push(`- **Iteration ${p.iteration ?? "?"}**: ${p.title}`);
+          if (p.description) lines.push(`  - ${p.description}`);
+          lines.push(`  - Status: ${p.status}`);
+        }
+        lines.push("");
+      }
+
+      if (tradeoffs.length > 0) {
+        lines.push("### Tradeoffs Discussed\n");
+        for (const t of tradeoffs) {
+          lines.push(`- **${t.title}**`);
+          if (t.tradeoffs && t.tradeoffs.length > 0) {
+            lines.push("  - Options considered:");
+            for (const opt of t.tradeoffs) {
+              lines.push(`    - ${opt}`);
+            }
+          }
+          if (t.alternatives && t.alternatives.length > 0) {
+            lines.push("  - Rejected alternatives:");
+            for (const alt of t.alternatives) {
+              lines.push(`    - ✗ ${alt}`);
+            }
+          }
+          lines.push(`  - Decision: ${t.description}`);
+        }
+        lines.push("");
+      }
+
+      if (criticReviews.length > 0) {
+        lines.push("### Critic Reviews\n");
+        for (const c of criticReviews) {
+          lines.push(`- **${c.title}** [${c.status}]`);
+          if (c.feedback) {
+            lines.push(`  - Feedback: ${c.feedback}`);
+          }
+        }
+        lines.push("");
+      }
+
+      if (architectReviews.length > 0) {
+        lines.push("### Architect Reviews\n");
+        for (const a of architectReviews) {
+          lines.push(`- **${a.title}** [${a.status}]`);
+          if (a.feedback) {
+            lines.push(`  - Feedback: ${a.feedback}`);
+          }
         }
         lines.push("");
       }
