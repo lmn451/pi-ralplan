@@ -40,15 +40,6 @@ export function resolveWorktreePath(directory: string, name: string): string {
   return join(resolveWorktreeRoot(directory), name);
 }
 
-/** Get default worktree config */
-export function getDefaultWorktreeConfig(directory: string): { baseBranch: string; worktreeRoot: string; createBranch: boolean } {
-  return {
-    baseBranch: "main",
-    worktreeRoot: resolveWorktreeRoot(directory),
-    createBranch: true,
-  };
-}
-
 /** Escape special characters for embedding in prompts */
 export function escapeForPrompt(text: string): string {
   return text

@@ -2,14 +2,17 @@
  * Git worktree management utilities.
  */
 
-import { execSync } from "child_process";
-import { resolve, join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
+// Default worktree settings
+export const DEFAULT_BASE_BRANCH = "main";
+export const DEFAULT_CREATE_BRANCH = true;
+export const DEFAULT_AUTO_CLEANUP = false;
 
-import type { WorktreeConfig } from "./config.js";
-
-// Re-export WorktreeConfig for convenience
-export type { WorktreeConfig };
+export interface WorktreeConfig {
+  baseBranch: string;
+  worktreeRoot: string;
+  createBranch: boolean;
+  autoCleanup?: boolean;
+}
 
 export interface WorktreeResult {
   success: boolean;
@@ -36,6 +39,10 @@ export function validateWorktree(path: string): boolean {
   }
 }
 
+import { execSync } from "child_process";
+import { resolve, join } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+
 export function createWorktree(config: WorktreeConfig, name: string): WorktreeResult {
   const maxRetries = 3;
   let lastError: string = "Unknown error";
@@ -58,7 +65,7 @@ export function createWorktree(config: WorktreeConfig, name: string): WorktreeRe
       }
 
       // Validate and sanitize baseBranch - prevents command injection
-      const baseBranch = config.baseBranch || "main";
+      const baseBranch = config.baseBranch || DEFAULT_BASE_BRANCH;
       if (!/^[a-zA-Z0-9._\/-]+$/.test(baseBranch)) {
         throw new Error(`Invalid baseBranch: ${baseBranch}`);
       }
