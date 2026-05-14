@@ -3,8 +3,6 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from "
 import { dirname } from "node:path";
 import { resolveStatePath, resolveAnswersPath } from "./utils.js";
 import type { PipelineTracking } from "./pipeline.js";
-import type { BrainstormState } from "./brainstorm.js";
-import type { ADR } from "./adr.js";
 
 export type RalplanMode = "ralplan" | "brainstorm";
 
@@ -21,8 +19,7 @@ export interface RalplanState {
   sessionId?: string;
   startedAt: string;
   completedAt?: string;
-  worktreePath?: string;      // NEW: Associated worktree for this plan
-  adr?: ADR;                  // NEW: ADR for current plan
+  worktreePath?: string;      // Associated worktree for this plan
 }
 
 const CURRENT_VERSION = 3;

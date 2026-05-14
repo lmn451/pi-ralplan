@@ -97,7 +97,6 @@ interface PersistedState {
   answersPath?: string;
   brainstorm?: BrainstormState;
   worktreePath?: string;    // NEW: Associated worktree
-  adr?: ADR;                // NEW: ADR for current plan
 }
 
 const CUSTOM_TYPE = "ralplan-state";
@@ -156,8 +155,6 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       answersPath: state.answersPath,
       brainstorm: state.brainstorm,
       worktreePath: state.worktreePath,
-      adr: state.adr,
-    };
     };
     pi.appendEntry(CUSTOM_TYPE, persisted);
     writeRalplanStateFile(sessionCwd, state);
@@ -241,7 +238,6 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         brainstorm: data.brainstorm,
         sessionId: data.sessionId,
         worktreePath: data.worktreePath,
-        adr: data.adr,
         startedAt:
           data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
       };
