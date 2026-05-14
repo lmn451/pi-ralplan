@@ -23,8 +23,6 @@ import {
   generateSpecFilename,
 } from "./naming.js";
 import { resolveWorktreeRoot } from "./utils.js";
-import { createWorktree, type WorktreeConfig } from "./worktree.js";
-import { createADR } from "./adr.js";
 
 export { RALPLAN_COMPLETION_SIGNAL };
 export { EXECUTION_COMPLETION_SIGNAL };
@@ -132,23 +130,10 @@ export const ralplanAdapter: PipelineStageAdapter = {
     return config.planning === false;
   },
 
-  onEnter(context: PipelineContext): void {
-    // Create worktree when planning stage begins
-    const worktreeName = generateWorktreeName(context.idea);
-    const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
-    const worktreeConfig: WorktreeConfig = {
-      baseBranch: "main",
-      worktreeRoot,
-      createBranch: true,
-    };
-
-    const result = createWorktree(worktreeConfig, worktreeName);
-    if (result.success && result.path) {
-      // Worktree created - path will be stored in state by index.ts
-      console.log(`[ralplan] Worktree created: ${result.path}`);
-    } else {
-      console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
-    }
+  // Note: worktree creation is handled in index.ts command handlers
+  // to properly store the path in state
+  onEnter(_context: PipelineContext): void {
+    // Worktree is created in /ralplan or /brainstorm command handlers
   },
 
   getPrompt(context: PipelineContext): string {

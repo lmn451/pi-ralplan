@@ -96,6 +96,8 @@ interface PersistedState {
   mode?: RalplanMode;
   answersPath?: string;
   brainstorm?: BrainstormState;
+  worktreePath?: string;    // NEW: Associated worktree
+  adr?: ADR;                // NEW: ADR for current plan
 }
 
 const CUSTOM_TYPE = "ralplan-state";
@@ -153,6 +155,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       mode: state.mode,
       answersPath: state.answersPath,
       brainstorm: state.brainstorm,
+      worktreePath: state.worktreePath,
+      adr: state.adr,
+    };
     };
     pi.appendEntry(CUSTOM_TYPE, persisted);
     writeRalplanStateFile(sessionCwd, state);
@@ -225,7 +230,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       const data = ralplanEntry.data;
       const status = getPipelineStatus(data.tracking);
       state = {
-        version: 2,
+        version: 3,
         active: status.isComplete ? false : data.active,
         mode: data.mode ?? "ralplan",
         pipeline: data.tracking,
@@ -235,6 +240,8 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         answersPath: data.answersPath,
         brainstorm: data.brainstorm,
         sessionId: data.sessionId,
+        worktreePath: data.worktreePath,
+        adr: data.adr,
         startedAt:
           data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
       };
@@ -290,7 +297,27 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
           new Date().toISOString();
       }
 
+      // Create worktree and store path in state
+      const worktreeName = idea
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-| -$/g, "")
+        .slice(0, 40) || "plan";
+      const worktreeRoot = resolveWorktreeRoot(sessionCwd);
+      const worktreeConfig: WorktreeConfig = {
+        baseBranch: "main",
+        worktreeRoot,
+        createBranch: true,
+      };
+      const worktreeResult = createWorktree(worktreeConfig, worktreeName);
+      if (worktreeResult.success && worktreeResult.path) {
+        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+      } else {
+        console.warn(`[ralplan] Worktree creation failed: ${worktreeResult.error}`);
+      }
+
       state = buildDefaultState(idea, tracking, undefined, "ralplan", sessionCwd);
+      state.worktreePath = worktreeResult.success ? worktreeResult.path : undefined;
       persistState();
       updateUI(ctx);
 
@@ -345,9 +372,29 @@ ${prompt}`,
         tracking.stages[tracking.currentStageIndex].startedAt =
           new Date().toISOString();
       }
+      // Create worktree and store path in state (brainstorm also uses worktrees)
+      const worktreeName = idea
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-| -$/g, "")
+        .slice(0, 40) || "plan";
+      const worktreeRoot = resolveWorktreeRoot(sessionCwd);
+      const worktreeConfig: WorktreeConfig = {
+        baseBranch: "main",
+        worktreeRoot,
+        createBranch: true,
+      };
+      const worktreeResult = createWorktree(worktreeConfig, worktreeName);
+      if (worktreeResult.success && worktreeResult.path) {
+        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+      } else {
+        console.warn(`[ralplan] Worktree creation failed: ${worktreeResult.error}`);
+      }
 
       state = buildDefaultState(idea, tracking, undefined, "brainstorm", sessionCwd);
+      state.worktreePath = worktreeResult.success ? worktreeResult.path : undefined;
       persistState();
+      updateUI(ctx);
       updateUI(ctx);
 
       ctx.ui.notify(`BRAINSTORM started: ${idea}`, "info");
