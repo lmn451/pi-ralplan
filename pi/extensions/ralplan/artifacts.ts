@@ -1,7 +1,19 @@
-import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync, appendFileSync } from "node:fs";
+import {
+  readdirSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  appendFileSync,
+} from "node:fs";
 import { basename, join } from "node:path";
 import { ensureRalplanDir, resolvePlansDir } from "./utils.js";
-import { formatDate, generatePlanFilename, generateSpecFilename, sanitizeDescription } from "./naming.js";
+import {
+  formatDate,
+  generatePlanFilename,
+  generateSpecFilename,
+  sanitizeDescription,
+} from "./naming.js";
 
 export interface PlanningArtifacts {
   specPaths: string[];
@@ -12,17 +24,17 @@ export interface PlanningArtifacts {
 /** Generate default artifact filename with date-based naming */
 export function getDefaultArtifactFilename(
   type: "spec" | "plan" | "test-spec",
-  description?: string
+  description?: string,
 ): string {
   const date = formatDate();
-  
+
   switch (type) {
     case "spec":
-      return description 
+      return description
         ? `spec-${date}-${sanitizeDescription(description)}.md`
         : `spec-${date}.md`;
     case "plan":
-      return description 
+      return description
         ? `plan-${date}-${sanitizeDescription(description)}.md`
         : `plan-${date}.md`;
     case "test-spec":
@@ -33,7 +45,9 @@ export function getDefaultArtifactFilename(
 }
 
 /** Legacy function for backward compatibility */
-export function getLegacyArtifactFilename(type: "spec" | "plan" | "test-spec"): string {
+export function getLegacyArtifactFilename(
+  type: "spec" | "plan" | "test-spec",
+): string {
   switch (type) {
     case "spec":
       return "spec.md";
@@ -56,7 +70,10 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function getSectionContent(markdown: string, heading: string): string | null {
+export function getSectionContent(
+  markdown: string,
+  heading: string,
+): string | null {
   const headingRe = new RegExp(`^##\\s+${escapeRegex(heading)}[ \\t]*$`, "im");
   const headingMatch = headingRe.exec(markdown);
   if (!headingMatch || headingMatch.index === undefined) return null;
@@ -64,12 +81,16 @@ export function getSectionContent(markdown: string, heading: string): string | n
   const bodyStart = headingMatch.index + headingMatch[0].length;
   const rest = markdown.slice(bodyStart).replace(/^\r?\n/, "");
   const nextHeadingMatch = /\r?\n##\s+/.exec(rest);
-  const body = (nextHeadingMatch ? rest.slice(0, nextHeadingMatch.index) : rest).trim();
+  const body = (
+    nextHeadingMatch ? rest.slice(0, nextHeadingMatch.index) : rest
+  ).trim();
   return body.length > 0 ? body : null;
 }
 
 function hasRequiredSections(markdown: string, headings: string[]): boolean {
-  return headings.every((heading) => getSectionContent(markdown, heading) !== null);
+  return headings.every(
+    (heading) => getSectionContent(markdown, heading) !== null,
+  );
 }
 
 function sortArtifactPathsDescending(paths: string[]): string[] {
@@ -128,7 +149,10 @@ export function isPlanningComplete(artifacts: PlanningArtifacts): boolean {
   if (!latestSpec || !latestPlan) return false;
 
   return (
-    hasRequiredSections(latestSpec, ["Acceptance criteria", "Requirement coverage map"]) &&
+    hasRequiredSections(latestSpec, [
+      "Acceptance criteria",
+      "Requirement coverage map",
+    ]) &&
     hasRequiredSections(latestPlan, [
       "Architecture Decision Record (ADR)",
       "Task Breakdown",

@@ -20,21 +20,30 @@ export function sanitizeDescription(desc: string): string {
 }
 
 /** Generate plan filename with date */
-export function generatePlanFilename(description: string, date: Date = new Date()): string {
+export function generatePlanFilename(
+  description: string,
+  date: Date = new Date(),
+): string {
   const dateStr = formatDate(date);
   const slug = sanitizeDescription(description);
   return `plan-${dateStr}-${slug}.md`;
 }
 
 /** Generate spec filename with date */
-export function generateSpecFilename(description: string, date: Date = new Date()): string {
+export function generateSpecFilename(
+  description: string,
+  date: Date = new Date(),
+): string {
   const dateStr = formatDate(date);
   const slug = sanitizeDescription(description);
   return `spec-${dateStr}-${slug}.md`;
 }
 
 /** Resolve increment for date collision */
-export function resolveFilenameIncrement(baseName: string, counter: number): string {
+export function resolveFilenameIncrement(
+  baseName: string,
+  counter: number,
+): string {
   if (counter === 0) return baseName;
   const ext = baseName.endsWith(".md") ? ".md" : "";
   const base = ext ? baseName.slice(0, -3) : baseName;

@@ -4,15 +4,15 @@
 
 import { randomUUID } from "node:crypto";
 
-export type ADREntryType = 
-  | "open-question" 
-  | "decision" 
-  | "approval" 
+export type ADREntryType =
+  | "open-question"
+  | "decision"
+  | "approval"
   | "rejection"
-  | "plan-iteration"     // Track plan iterations through architect/critic
-  | "tradeoff"            // Track tradeoffs discussed
-  | "critic-review"       // Record critic review feedback
-  | "architect-review";    // Record architect review feedback
+  | "plan-iteration" // Track plan iterations through architect/critic
+  | "tradeoff" // Track tradeoffs discussed
+  | "critic-review" // Record critic review feedback
+  | "architect-review"; // Record architect review feedback
 
 export type ADRStatus = "pending" | "approved" | "rejected";
 
@@ -24,11 +24,11 @@ export interface ADREntry {
   status: ADRStatus;
   author?: string;
   timestamp: string;
-  reason?: string;           // For rejections
-  iteration?: number;        // For plan-iteration: iteration number
-  tradeoffs?: string[];      // For tradeoff: list of options considered
-  alternatives?: string[];   // For tradeoff: alternatives that were rejected
-  feedback?: string;         // For critic/architect reviews: the actual feedback
+  reason?: string; // For rejections
+  iteration?: number; // For plan-iteration: iteration number
+  tradeoffs?: string[]; // For tradeoff: list of options considered
+  alternatives?: string[]; // For tradeoff: alternatives that were rejected
+  feedback?: string; // For critic/architect reviews: the actual feedback
 }
 
 export interface ADR {
@@ -83,7 +83,9 @@ export function createADR(): ADR {
       const planIterations = entries.filter((e) => e.type === "plan-iteration");
       const tradeoffs = entries.filter((e) => e.type === "tradeoff");
       const criticReviews = entries.filter((e) => e.type === "critic-review");
-      const architectReviews = entries.filter((e) => e.type === "architect-review");
+      const architectReviews = entries.filter(
+        (e) => e.type === "architect-review",
+      );
 
       if (questions.length > 0) {
         lines.push("### Open Questions\n");

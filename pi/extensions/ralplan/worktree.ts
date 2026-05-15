@@ -43,7 +43,10 @@ import { execSync } from "child_process";
 import { resolve, join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 
-export function createWorktree(config: WorktreeConfig, name: string): WorktreeResult {
+export function createWorktree(
+  config: WorktreeConfig,
+  name: string,
+): WorktreeResult {
   const maxRetries = 3;
   let lastError: string = "Unknown error";
 
@@ -69,24 +72,27 @@ export function createWorktree(config: WorktreeConfig, name: string): WorktreeRe
       if (!/^[a-zA-Z0-9._\/-]+$/.test(baseBranch)) {
         throw new Error(`Invalid baseBranch: ${baseBranch}`);
       }
-      
+
       // Build safe git commands with properly quoted arguments
       if (config.createBranch) {
         const branchName = `feature/${sanitizedName}`;
         execSync(
           `git worktree add -b "${branchName}" "${worktreePath}" "${baseBranch}"`,
-          { stdio: "pipe", shell: "/bin/bash" }
+          { stdio: "pipe", shell: "/bin/bash" },
         );
       } else {
-        execSync(
-          `git worktree add "${worktreePath}" "${baseBranch}"`,
-          { stdio: "pipe", shell: "/bin/bash" }
-        );
+        execSync(`git worktree add "${worktreePath}" "${baseBranch}"`, {
+          stdio: "pipe",
+          shell: "/bin/bash",
+        });
       }
 
       // Validate created worktree
       if (!validateWorktree(worktreePath)) {
-        return { success: false, error: "Worktree created but validation failed" };
+        return {
+          success: false,
+          error: "Worktree created but validation failed",
+        };
       }
 
       return { success: true, path: worktreePath };
@@ -104,12 +110,17 @@ export function createWorktree(config: WorktreeConfig, name: string): WorktreeRe
     }
   }
 
-  return { success: false, error: `Failed after ${maxRetries} attempts: ${lastError}` };
+  return {
+    success: false,
+    error: `Failed after ${maxRetries} attempts: ${lastError}`,
+  };
 }
 
 export function listWorktrees(): string[] {
   try {
-    const output = execSync("git worktree list --porcelain", { encoding: "utf-8" });
+    const output = execSync("git worktree list --porcelain", {
+      encoding: "utf-8",
+    });
     return output
       .split("\n\n")
       .map((entry) => {
@@ -124,12 +135,15 @@ export function listWorktrees(): string[] {
 
 export function cleanupWorktree(path: string): WorktreeResult {
   try {
-    execSync(`git worktree remove "${path}"`, { stdio: "pipe", shell: "/bin/bash" });
+    execSync(`git worktree remove "${path}"`, {
+      stdio: "pipe",
+      shell: "/bin/bash",
+    });
     return { success: true };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
