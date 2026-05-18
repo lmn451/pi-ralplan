@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -45,7 +51,11 @@ describe("readPlanningArtifacts", () => {
   it("finds timestamped files", () => {
     writeFileSync(join(plansDir, "spec-2024-01-01.md"), "# Spec", "utf-8");
     writeFileSync(join(plansDir, "plan-2024-01-01.md"), "# Plan", "utf-8");
-    writeFileSync(join(plansDir, "test-spec-2024-01-01.md"), "# Tests", "utf-8");
+    writeFileSync(
+      join(plansDir, "test-spec-2024-01-01.md"),
+      "# Tests",
+      "utf-8",
+    );
     const artifacts = readPlanningArtifacts(tempDir);
     expect(artifacts.specPaths).toHaveLength(1);
     expect(artifacts.planPaths).toHaveLength(1);
@@ -74,7 +84,11 @@ describe("isPlanningComplete", () => {
   });
 
   it("returns false when spec is missing required sections", () => {
-    writeFileSync(join(plansDir, "spec.md"), "# Spec\n\nNo sections here.", "utf-8");
+    writeFileSync(
+      join(plansDir, "spec.md"),
+      "# Spec\n\nNo sections here.",
+      "utf-8",
+    );
     writeFileSync(
       join(plansDir, "plan.md"),
       "# Plan\n\n## Architecture Decision Record (ADR)\nDecision details\n\n## Task Breakdown\n- task\n\n## Dependency Graph\n- dep\n\n## Acceptance Criteria per Task\n- criterion\n\n## Risk Register\n- risk\n",

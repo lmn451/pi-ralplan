@@ -187,7 +187,7 @@ Read the spec or create one at \`${specPath}\`
 
 ### Part 2: Direct Planning
 
-${getDirectPlanningPrompt(specPath)}
+${getDirectPlanningPrompt(specPath, planPath)}
 
 Save the plan to: \`${planPath}\`
 

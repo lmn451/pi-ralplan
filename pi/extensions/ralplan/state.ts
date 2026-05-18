@@ -1,8 +1,15 @@
 import { getDefaultArtifactFilename } from "./artifacts.js";
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  unlinkSync,
+  mkdirSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import { resolveStatePath, resolveAnswersPath } from "./utils.js";
 import type { PipelineTracking } from "./pipeline.js";
+import type { BrainstormState } from "./brainstorm.js";
 
 export type RalplanMode = "ralplan" | "brainstorm";
 
@@ -19,7 +26,7 @@ export interface RalplanState {
   sessionId?: string;
   startedAt: string;
   completedAt?: string;
-  worktreePath?: string;      // Associated worktree for this plan
+  worktreePath?: string; // Associated worktree for this plan
 }
 
 const CURRENT_VERSION = 3;
@@ -31,7 +38,10 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
   try {
     const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (typeof parsed.version !== "number" || parsed.version > CURRENT_VERSION) {
+    if (
+      typeof parsed.version !== "number" ||
+      parsed.version > CURRENT_VERSION
+    ) {
       // Future version, can't read
       return null;
     }
@@ -41,10 +51,10 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
       parsed.mode = "ralplan";
       // brainstorm and answersPath are undefined — correct for v1
     }
-    // v2 → v3 migration: add worktreePath and adr
+    // v2 → v3 migration: add worktreePath
     if (parsed.version === 2) {
       parsed.version = 3;
-      // worktreePath and adr will be undefined — correct for v2
+      // worktreePath will be undefined — correct for v2
     }
     return parsed as unknown as RalplanState;
   } catch {
@@ -53,7 +63,10 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
 }
 
 /** Write ralplan state to file */
-export function writeRalplanStateFile(directory: string, state: RalplanState): void {
+export function writeRalplanStateFile(
+  directory: string,
+  state: RalplanState,
+): void {
   const path = resolveStatePath(directory);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(state, null, 2), "utf-8");
@@ -91,8 +104,7 @@ export function buildDefaultState(
     planPath: `plans/${getDefaultArtifactFilename("plan")}`,
     sessionId,
     startedAt: new Date().toISOString(),
-    worktreePath: undefined,  // NEW: Set after worktree creation
-    adr: undefined,            // NEW: Set after ADR creation
+    worktreePath: undefined, // Set after worktree creation
   };
 
   if (mode === "brainstorm") {

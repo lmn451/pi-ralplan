@@ -11,6 +11,7 @@ export const QA_COMPLETION_SIGNAL = "PIPELINE_QA_COMPLETE";
 /** Generate the expansion phase prompt (Phase 0) */
 export function getExpansionPrompt(
   idea: string,
+  specPath: string,
   openQuestionsPath?: string,
 ): string {
   const oqPath = openQuestionsPath || "plans/open-questions.md";
@@ -77,7 +78,7 @@ Save to: \`${oqPath}\`
 ### Step 3: Save Combined Spec
 
 Combine Analyst requirements + Architect technical spec into a single document.
-Save to: \`plans/spec.md\`
+Save to: \`${specPath}\`
 
 ### Step 4: Signal Completion
 
@@ -85,7 +86,10 @@ When the spec is saved, signal: EXPANSION_COMPLETE`;
 }
 
 /** Generate the direct planning prompt */
-export function getDirectPlanningPrompt(specPath: string): string {
+export function getDirectPlanningPrompt(
+  specPath: string,
+  planPath: string,
+): string {
   return `## DIRECT PLANNING
 
 The spec is complete. Create implementation plan directly.
@@ -125,7 +129,7 @@ Generate a comprehensive implementation plan with:
    - Identified risks
    - Mitigation strategies
 
-Save to: plans/plan.md
+Save to: ${planPath}
 Signal completion with: PLAN_CREATED"
 )
 \`\`\`
@@ -139,7 +143,7 @@ Task(
   agent="critic",
   prompt="REVIEW IMPLEMENTATION PLAN
 
-Plan file: plans/plan.md
+Plan file: ${planPath}
 Original spec: ${specPath}
 
 Verify:
@@ -377,7 +381,7 @@ Your task: Expand the idea into a detailed spec and implementation plan using co
 
 ### Part 1: Idea Expansion (Spec Creation)
 
-${getExpansionPrompt(context.idea, context.openQuestionsPath)}
+${getExpansionPrompt(context.idea, specPath, context.openQuestionsPath)}
 
 ### Part 2: Consensus Planning
 
@@ -402,7 +406,8 @@ Signal: ${RALPLAN_COMPLETION_SIGNAL}`;
 /** Generate the brainstorm expansion prompt (expanding sub-phase) */
 export function getBrainstormExpansionPrompt(context: PipelineContext): string {
   const specPath = context.specPath || "plans/spec.md";
-  const openQuestionsPath = context.openQuestionsPath || "plans/open-questions.md";
+  const openQuestionsPath =
+    context.openQuestionsPath || "plans/open-questions.md";
 
   return `## BRAINSTORM — Idea Expansion
 
@@ -411,14 +416,17 @@ Your task: Expand the idea into requirements and identify **open questions** tha
 **Original Idea:** "${escapeForPrompt(context.idea)}"
 
 ### Step 1: Requirements Analysis
+
 Spawn an Analyst subagent to extract functional and non-functional requirements.
 
 ### Step 2: Identify Open Questions
+
 The Analyst MUST produce a \`## Open Questions\` section. For each question:
 - Why it matters
 - What decision is blocked until answered
 
 ### Step 3: Persist Questions
+
 Save the open questions to: \`${openQuestionsPath}\` using this format:
 
 \`\`\`markdown
@@ -428,11 +436,11 @@ Save the open questions to: \`${openQuestionsPath}\` using this format:
 \`\`\`
 
 ### Step 4: Signal
+
 When questions are saved, output exactly:
 ${BRAINSTORM_OPEN_QUESTIONS_READY}
 
-**IMPORTANT:** Do NOT proceed to consensus planning. Do NOT answer the open questions yourself. Stop and wait for the user.
-`;
+**IMPORTANT:** Do NOT proceed to consensus planning. Do NOT answer the open questions yourself. Stop and wait for the user.`;
 }
 
 /** Generate the brainstorm steering prompt (awaiting-answers sub-phase) */
@@ -459,12 +467,14 @@ The user has provided answers to the open questions.
 ${answersBlock || "No specific answers were provided. Proceed with best-effort planning."}
 
 ### Your Task
+
 1. Read the answers above.
 2. Continue expanding the idea into a full spec at \`${specPath}\`.
 3. Proceed with consensus planning (Planner → Architect → Critic).
 4. Save the plan to: \`${planPath}\`
 
 ### Completion
+
 When both the spec AND the consensus plan are complete and approved:
 
 Signal: PIPELINE_RALPLAN_COMPLETE`;
@@ -472,9 +482,7 @@ Signal: PIPELINE_RALPLAN_COMPLETE`;
 
 /** Generate the brainstorm awaiting prompt (user-facing, not an AI prompt) */
 export function getBrainstormAwaitingPrompt(questions: string[]): string {
-  const questionList = questions
-    .map((q, i) => `${i + 1}. **${q}**`)
-    .join("\n");
+  const questionList = questions.map((q, i) => `${i + 1}. **${q}**`).join("\n");
 
   return `## 🧠 Brainstorm — Awaiting Your Input
 

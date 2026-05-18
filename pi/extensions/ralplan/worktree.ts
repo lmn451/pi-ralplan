@@ -2,6 +2,10 @@
  * Git worktree management utilities.
  */
 
+import { execFileSync } from "child_process";
+import { resolve, join } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+
 // Default worktree settings
 export const DEFAULT_BASE_BRANCH = "main";
 export const DEFAULT_CREATE_BRANCH = true;
@@ -18,6 +22,35 @@ export interface WorktreeResult {
   success: boolean;
   path?: string;
   error?: string;
+}
+
+/** Detect the default branch of a git repository */
+export function detectDefaultBranch(cwd: string): string {
+  try {
+    // First try: symbolic-ref for remote HEAD (works for cloned repos)
+    const symbolicRef = execFileSync(
+      "git",
+      ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
+      { cwd, stdio: "pipe", encoding: "utf-8" },
+    ).trim();
+    if (symbolicRef) return symbolicRef.replace("origin/", "");
+  } catch {
+    // Fall through
+  }
+
+  try {
+    // Second try: branch --show-current (works for local repos)
+    const currentBranch = execFileSync("git", ["branch", "--show-current"], {
+      cwd,
+      stdio: "pipe",
+      encoding: "utf-8",
+    }).trim();
+    if (currentBranch) return currentBranch;
+  } catch {
+    // Fall through
+  }
+
+  return DEFAULT_BASE_BRANCH;
 }
 
 /** Sanitize worktree name for directory traversal */
@@ -38,10 +71,6 @@ export function validateWorktree(path: string): boolean {
     return false;
   }
 }
-
-import { execSync } from "child_process";
-import { resolve, join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
 
 export function createWorktree(
   config: WorktreeConfig,
@@ -67,23 +96,25 @@ export function createWorktree(
         // Invalid existing worktree, treat as new
       }
 
-      // Validate and sanitize baseBranch - prevents command injection
+      // Validate and sanitize baseBranch
       const baseBranch = config.baseBranch || DEFAULT_BASE_BRANCH;
       if (!/^[a-zA-Z0-9._\/-]+$/.test(baseBranch)) {
         throw new Error(`Invalid baseBranch: ${baseBranch}`);
       }
 
-      // Build safe git commands with properly quoted arguments
+      // Build safe git commands using argument arrays (no shell interpolation)
       if (config.createBranch) {
         const branchName = `feature/${sanitizedName}`;
-        execSync(
-          `git worktree add -b "${branchName}" "${worktreePath}" "${baseBranch}"`,
-          { stdio: "pipe", shell: "/bin/bash" },
+        execFileSync(
+          "git",
+          ["worktree", "add", "-b", branchName, worktreePath, baseBranch],
+          {
+            stdio: "pipe",
+          },
         );
       } else {
-        execSync(`git worktree add "${worktreePath}" "${baseBranch}"`, {
+        execFileSync("git", ["worktree", "add", worktreePath, baseBranch], {
           stdio: "pipe",
-          shell: "/bin/bash",
         });
       }
 
@@ -102,7 +133,7 @@ export function createWorktree(
         // Exponential backoff: 100ms, 200ms, 400ms
         const delay = 100 * Math.pow(2, attempt);
         try {
-          execSync(`sleep ${delay / 1000}`, { stdio: "pipe" });
+          execFileSync("sleep", [String(delay / 1000)], { stdio: "pipe" });
         } catch {
           // Ignore sleep errors
         }
@@ -118,7 +149,7 @@ export function createWorktree(
 
 export function listWorktrees(): string[] {
   try {
-    const output = execSync("git worktree list --porcelain", {
+    const output = execFileSync("git", ["worktree", "list", "--porcelain"], {
       encoding: "utf-8",
     });
     return output
@@ -135,9 +166,8 @@ export function listWorktrees(): string[] {
 
 export function cleanupWorktree(path: string): WorktreeResult {
   try {
-    execSync(`git worktree remove "${path}"`, {
+    execFileSync("git", ["worktree", "remove", path], {
       stdio: "pipe",
-      shell: "/bin/bash",
     });
     return { success: true };
   } catch (error) {

@@ -5,7 +5,7 @@ import type {
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { readFileSync } from "node:fs";
-
+import { join } from "node:path";
 import {
   registerAdapters,
   buildPipelineTracking,
@@ -59,9 +59,13 @@ import {
 } from "./artifacts.js";
 
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
+import { resolveOpenQuestionsPath, resolveWorktreeRoot } from "./utils.js";
+
 import {
-  resolveOpenQuestionsPath,
-} from "./utils.js";
+  createWorktree,
+  detectDefaultBranch,
+  type WorktreeConfig,
+} from "./worktree.js";
 
 import {
   createBrainstormState,
@@ -96,7 +100,7 @@ interface PersistedState {
   mode?: RalplanMode;
   answersPath?: string;
   brainstorm?: BrainstormState;
-  worktreePath?: string;    // NEW: Associated worktree
+  worktreePath?: string; // NEW: Associated worktree
 }
 
 const CUSTOM_TYPE = "ralplan-state";
@@ -126,16 +130,27 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     return state?.active === true;
   }
 
+  function getWorkspaceDir(): string {
+    return state?.worktreePath ?? sessionCwd;
+  }
+
+  function toWorkspacePath(path?: string): string | undefined {
+    if (!path || !state?.worktreePath) return path;
+    return join(state.worktreePath, path);
+  }
+
   function buildContext(): PipelineContext | null {
     if (!state) return null;
     return {
       idea: state.originalIdea,
-      directory: sessionCwd,
+      directory: getWorkspaceDir(),
       sessionId: state.sessionId,
-      specPath: state.specPath,
-      planPath: state.planPath,
-      openQuestionsPath: "plans/open-questions.md",
-      answersPath: state.answersPath,
+      specPath: toWorkspacePath(state.specPath),
+      planPath: toWorkspacePath(state.planPath),
+      openQuestionsPath: state.worktreePath
+        ? resolveOpenQuestionsPath(state.worktreePath)
+        : "plans/open-questions.md",
+      answersPath: toWorkspacePath(state.answersPath),
       config: state.pipeline.pipelineConfig,
       mode: state.mode,
       brainstorm: state.brainstorm,
@@ -217,10 +232,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
 
     // Find the most recent ralplan-state entry
     const ralplanEntry = entries
-      .filter(
-        (e) =>
-          e.type === "custom" && e.customType === CUSTOM_TYPE,
-      )
+      .filter((e) => e.type === "custom" && e.customType === CUSTOM_TYPE)
       .pop() as { data?: PersistedState } | undefined;
 
     if (ralplanEntry?.data) {
@@ -263,8 +275,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerFlag("brainstorm", {
-    description:
-      "Start a brainstorm-mode session with the initial prompt",
+    description: "Start a brainstorm-mode session with the initial prompt",
     type: "boolean",
     default: false,
   });
@@ -294,14 +305,15 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       }
 
       // Create worktree and store path in state
-      const worktreeName = idea
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-| -$/g, "")
-        .slice(0, 40) || "plan";
+      const worktreeName =
+        idea
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40) || "plan";
       const worktreeRoot = resolveWorktreeRoot(sessionCwd);
       const worktreeConfig: WorktreeConfig = {
-        baseBranch: "main",
+        baseBranch: detectDefaultBranch(sessionCwd),
         worktreeRoot,
         createBranch: true,
       };
@@ -309,11 +321,21 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       if (worktreeResult.success && worktreeResult.path) {
         console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
       } else {
-        console.warn(`[ralplan] Worktree creation failed: ${worktreeResult.error}`);
+        console.warn(
+          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+        );
       }
 
-      state = buildDefaultState(idea, tracking, undefined, "ralplan", sessionCwd);
-      state.worktreePath = worktreeResult.success ? worktreeResult.path : undefined;
+      state = buildDefaultState(
+        idea,
+        tracking,
+        undefined,
+        "ralplan",
+        sessionCwd,
+      );
+      state.worktreePath = worktreeResult.success
+        ? worktreeResult.path
+        : undefined;
       persistState();
       updateUI(ctx);
 
@@ -346,7 +368,8 @@ ${prompt}`,
   });
 
   pi.registerCommand("brainstorm", {
-    description: "Start brainstorm planning for an idea (user answers open questions)",
+    description:
+      "Start brainstorm planning for an idea (user answers open questions)",
     handler: async (args, ctx) => {
       if (isActive()) {
         ctx.ui.notify(
@@ -369,14 +392,15 @@ ${prompt}`,
           new Date().toISOString();
       }
       // Create worktree and store path in state (brainstorm also uses worktrees)
-      const worktreeName = idea
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-| -$/g, "")
-        .slice(0, 40) || "plan";
+      const worktreeName =
+        idea
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40) || "plan";
       const worktreeRoot = resolveWorktreeRoot(sessionCwd);
       const worktreeConfig: WorktreeConfig = {
-        baseBranch: "main",
+        baseBranch: detectDefaultBranch(sessionCwd),
         worktreeRoot,
         createBranch: true,
       };
@@ -384,13 +408,22 @@ ${prompt}`,
       if (worktreeResult.success && worktreeResult.path) {
         console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
       } else {
-        console.warn(`[ralplan] Worktree creation failed: ${worktreeResult.error}`);
+        console.warn(
+          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+        );
       }
 
-      state = buildDefaultState(idea, tracking, undefined, "brainstorm", sessionCwd);
-      state.worktreePath = worktreeResult.success ? worktreeResult.path : undefined;
+      state = buildDefaultState(
+        idea,
+        tracking,
+        undefined,
+        "brainstorm",
+        sessionCwd,
+      );
+      state.worktreePath = worktreeResult.success
+        ? worktreeResult.path
+        : undefined;
       persistState();
-      updateUI(ctx);
       updateUI(ctx);
 
       ctx.ui.notify(`BRAINSTORM started: ${idea}`, "info");
@@ -434,9 +467,10 @@ ${prompt}`,
 
       const status = getPipelineStatus(state.pipeline);
       const lines = formatPipelineHUD(state.pipeline);
-      const modeLine = state.mode === "brainstorm"
-        ? `\nMode: Brainstorm (${state.brainstorm?.subPhase ?? "unknown"})`
-        : "";
+      const modeLine =
+        state.mode === "brainstorm"
+          ? `\nMode: Brainstorm (${state.brainstorm?.subPhase ?? "unknown"})`
+          : "";
       const msg = `**RALPLAN Status**\n\nProgress: ${status.progress}${modeLine}\n\n${lines.join("\n")}`;
       ctx.ui.notify(msg, "info");
     },
@@ -515,7 +549,10 @@ ${prompt}`,
         return;
       }
 
-      if (state.mode !== "brainstorm" || state.brainstorm?.subPhase !== "awaiting-answers") {
+      if (
+        state.mode !== "brainstorm" ||
+        state.brainstorm?.subPhase !== "awaiting-answers"
+      ) {
         ctx.ui.notify("Not currently awaiting answers.", "info");
         return;
       }
@@ -541,7 +578,8 @@ ${prompt}`,
   });
 
   pi.registerCommand("ralplan:skip-questions", {
-    description: "Skip brainstorm open questions and proceed to planning (escape hatch)",
+    description:
+      "Skip brainstorm open questions and proceed to planning (escape hatch)",
     handler: async (_args, ctx) => {
       if (!isActive() || !state) {
         ctx.ui.notify("No active session.", "info");
@@ -564,7 +602,9 @@ ${prompt}`,
 
       // Write sentinel to answers.md
       if (state.answersPath) {
-        appendArtifact(sessionCwd, "answers.md",
+        appendArtifact(
+          getWorkspaceDir(),
+          "answers.md",
           "\n## Skipped — User declined to answer open questions. Proceeding with best-effort planning.\n",
         );
       }
@@ -590,7 +630,7 @@ ${prompt}`,
   pi.registerCommand("ralplan:artifacts", {
     description: "List planning artifacts",
     handler: async (_args, ctx) => {
-      const artifacts = readPlanningArtifacts(sessionCwd);
+      const artifacts = readPlanningArtifacts(getWorkspaceDir());
       const parts: string[] = [];
 
       if (artifacts.specPaths.length > 0) {
@@ -610,10 +650,7 @@ ${prompt}`,
       }
 
       if (parts.length === 0) {
-        ctx.ui.notify(
-          "No planning artifacts found in plans/",
-          "info",
-        );
+        ctx.ui.notify("No planning artifacts found in plans/", "info");
       } else {
         ctx.ui.notify(parts.join("\n\n"), "info");
       }
@@ -718,12 +755,12 @@ ${prompt}`,
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { ensureRalplanDir } = await import("./utils.js");
-
-      ensureRalplanDir(sessionCwd);
+      const targetDir = getWorkspaceDir();
+      ensureRalplanDir(targetDir);
 
       const filename =
         params.filename || getDefaultArtifactFilename(params.type);
-      const path = writeArtifact(sessionCwd, filename, params.content);
+      const path = writeArtifact(targetDir, filename, params.content);
 
       return {
         content: [{ type: "text", text: `Artifact saved to ${path}` }],
@@ -788,14 +825,24 @@ ${prompt}`,
     const text = event.text.trim();
 
     // Brainstorm answer accumulation during awaiting-answers
-    if (isActive() && isBrainstormMode(state) && isAwaitingAnswers(state?.brainstorm)) {
+    if (
+      isActive() &&
+      isBrainstormMode(state) &&
+      isAwaitingAnswers(state?.brainstorm)
+    ) {
       const result = processBrainstormInput(state!, text);
       // Append answer to state
-      state!.brainstorm = appendAnswer(state!.brainstorm!, result.appendAnswer.question, result.appendAnswer.answer);
+      state!.brainstorm = appendAnswer(
+        state!.brainstorm!,
+        result.appendAnswer.question,
+        result.appendAnswer.answer,
+      );
       // Append answer to answers.md on disk
       if (state!.answersPath) {
         try {
-          appendArtifact(sessionCwd, "answers.md",
+          appendArtifact(
+            getWorkspaceDir(),
+            "answers.md",
             `\n### Q: ${result.appendAnswer.question}\n${result.appendAnswer.answer}\n`,
           );
         } catch {
@@ -867,7 +914,10 @@ ${prompt}`,
 
     // During brainstorm awaiting-answers, inject steering prompt
     // (This keeps the AI from going off-track during answer collection)
-    if (state.mode === "brainstorm" && state.brainstorm?.subPhase === "awaiting-answers") {
+    if (
+      state.mode === "brainstorm" &&
+      state.brainstorm?.subPhase === "awaiting-answers"
+    ) {
       return {
         message: {
           customType: "brainstorm-steering",
@@ -917,21 +967,32 @@ ${prompt}`,
 
         // expanding sub-phase: check for OPEN_QUESTIONS_READY
         if (sub === "expanding") {
-          if (detectBrainstormSignal(lastText, BRAINSTORM_OPEN_QUESTIONS_READY)) {
+          if (
+            detectBrainstormSignal(lastText, BRAINSTORM_OPEN_QUESTIONS_READY)
+          ) {
             // Parse questions from open-questions.md
-            const questionsPath = resolveOpenQuestionsPath(sessionCwd);
+            const questionsPath = resolveOpenQuestionsPath(getWorkspaceDir());
             let questions: string[] = [];
             try {
               const content = readFileSync(questionsPath, "utf-8");
               questions = parseOpenQuestions(content);
             } catch {
-              ctx.ui.notify("Warning: Could not read open questions file. Proceeding with empty list.", "warning");
+              ctx.ui.notify(
+                "Warning: Could not read open questions file. Proceeding with empty list.",
+                "warning",
+              );
             }
 
             // Handle empty questions: auto-transition to planning
             if (questions.length === 0) {
-              ctx.ui.notify("No open questions found. Proceeding directly to planning.", "warning");
-              state.brainstorm = transitionSubPhase(state.brainstorm!, "planning");
+              ctx.ui.notify(
+                "No open questions found. Proceeding directly to planning.",
+                "warning",
+              );
+              state.brainstorm = transitionSubPhase(
+                state.brainstorm!,
+                "planning",
+              );
               persistState();
               updateUI(ctx);
 
@@ -1065,8 +1126,14 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
     updateUI(ctx);
 
     // Notify user if resuming an awaiting-answers brainstorm session
-    if (state?.mode === "brainstorm" && state.brainstorm?.subPhase === "awaiting-answers") {
-      ctx.ui.notify("🧠 Brainstorm session resumed. Awaiting your answers.", "info");
+    if (
+      state?.mode === "brainstorm" &&
+      state.brainstorm?.subPhase === "awaiting-answers"
+    ) {
+      ctx.ui.notify(
+        "🧠 Brainstorm session resumed. Awaiting your answers.",
+        "info",
+      );
     }
   });
 
@@ -1075,8 +1142,14 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
     updateUI(ctx);
 
     // Notify user if resuming an awaiting-answers brainstorm session
-    if (state?.mode === "brainstorm" && state.brainstorm?.subPhase === "awaiting-answers") {
-      ctx.ui.notify("🧠 Brainstorm session resumed. Awaiting your answers.", "info");
+    if (
+      state?.mode === "brainstorm" &&
+      state.brainstorm?.subPhase === "awaiting-answers"
+    ) {
+      ctx.ui.notify(
+        "🧠 Brainstorm session resumed. Awaiting your answers.",
+        "info",
+      );
     }
   });
 
