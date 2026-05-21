@@ -55,11 +55,17 @@ export function detectDefaultBranch(cwd: string): string {
 
 /** Sanitize worktree name for directory traversal */
 function sanitizeWorktreeName(name: string): string {
-  // Block directory traversal and null bytes
-  if (name.includes("..") || name.includes("\0")) {
+  // Block directory traversal, null bytes, and Windows-specific patterns
+  // Normalize backslashes to forward slashes for cross-platform check
+  const normalized = name.replace(/\\/g, "/").replace(/\0/g, "");
+  if (normalized.includes("..") || name.includes("\0")) {
     throw new Error("Invalid worktree name: directory traversal detected");
   }
-  return name.replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 50);
+  // Block absolute paths and drive letters
+  if (normalized.startsWith("/") || /^[a-zA-Z]:/.test(normalized)) {
+    throw new Error("Invalid worktree name: absolute paths not allowed");
+  }
+  return normalized.replace(/[^a-zA-Z0-9_./-]/g, "-").slice(0, 50);
 }
 
 /** Validate worktree exists and is valid */

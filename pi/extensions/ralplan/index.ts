@@ -895,7 +895,41 @@ ${prompt}`,
           new Date().toISOString();
       }
 
+      // Create worktree for this session (same pattern as /ralplan command)
+      const worktreeName =
+        idea
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 40) || "plan";
+      const worktreeRoot = resolveWorktreeRoot(sessionCwd);
+      const worktreeConfig: WorktreeConfig = {
+        baseBranch: detectDefaultBranch(sessionCwd),
+        worktreeRoot,
+        createBranch: true,
+      };
+
+      let worktreePath: string | undefined;
+      try {
+        const worktreeResult = createWorktree(worktreeConfig, worktreeName);
+        if (worktreeResult.success && worktreeResult.path) {
+          worktreePath = worktreeResult.path;
+          console.log(`[ralplan] Worktree created: ${worktreePath}`);
+        } else {
+          console.warn(
+            `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+          );
+          ctx.ui.notify(
+            `Worktree creation failed: ${worktreeResult.error}`,
+            "warning",
+          );
+        }
+      } catch (error) {
+        console.warn(`[ralplan] Worktree creation error: ${error}`);
+      }
+
       state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
+      state.worktreePath = worktreePath;
       persistState();
       updateUI(ctx);
 

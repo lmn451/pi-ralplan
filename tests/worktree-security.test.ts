@@ -189,3 +189,42 @@ describe("worktree security", () => {
     });
   });
 });
+
+describe("createWorktree() happy path", () => {
+  it("should return success and valid path for successful worktree creation", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ralplan-happy-"));
+    const repo = join(dir, "repo");
+    mkdirSync(repo, { recursive: true });
+    const prev = cwd();
+
+    try {
+      chdir(repo);
+      execSync("git init -b main", { stdio: "pipe" });
+      execSync("git config user.email test@example.com", { stdio: "pipe" });
+      execSync("git config user.name test", { stdio: "pipe" });
+      writeFileSync("README.md", "x\n", "utf-8");
+      execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+
+      const worktreesDir = join(dir, "worktrees");
+      const result = createWorktree(
+        { baseBranch: "main", worktreeRoot: worktreesDir, createBranch: true },
+        "happy-test",
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.path).toBeDefined();
+      expect(result.error).toBeUndefined();
+      // Verify worktree is valid (contains .git)
+      expect(existsSync(join(result.path!, ".git"))).toBe(true);
+      // Verify correct branch was created
+      const branches = execSync("git branch", {
+        cwd: result.path,
+        encoding: "utf-8",
+      });
+      expect(branches).toContain("feature/happy-test");
+    } finally {
+      chdir(prev);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

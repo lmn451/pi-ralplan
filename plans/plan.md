@@ -1,145 +1,46 @@
-# Implementation Plan v1.1 (Final)
+# Implementation Plan v1.2 (Final)
 
 **Based on:** `plans/spec.md`  
-**Incorporates:** Architect review feedback + Critic review feedback  
-**Created:** 2026-05-05  
-**Role:** Planner (Revised)  
+**Incorporates:** Architect review (APPROVED) + Critic review notes  
+**Created:** 2026-05-21  
+**Role:** Planner (Final)  
 **Status:** ✅ APPROVED
 
 ---
 
 ## 1. Task Breakdown
 
-### Phase 1: Core Infrastructure
-
-| Task | File(s) | Description |
-|------|---------|-------------|
-| T-1.1 | `pi/extensions/ralplan/naming.ts` | Date formatting and filename generation |
-| T-1.2 | `pi/extensions/ralplan/worktree.ts` | Git worktree creation and management |
-| T-1.3 | `pi/extensions/ralplan/adr.ts` | ADR data structure and utilities |
-
-### Phase 2: State Extension
-
-| Task | File(s) | Description |
-|------|---------|-------------|
-| T-2.1 | `pi/extensions/ralplan/state.ts` | Add `worktreePath` and `adr` to `RalplanState` |
-| T-2.2 | `pi/extensions/ralplan/utils.ts` | Add worktree path resolution utilities |
-
-### Phase 3: Adapter Integration
-
-| Task | File(s) | Description |
-|------|---------|-------------|
-| T-3.1 | `pi/extensions/ralplan/adapters.ts` | Integrate worktree creation at planning start |
-| T-3.2 | `pi/extensions/ralplan/adapters.ts` | Add date-based filename to prompts |
-| T-3.3 | `pi/extensions/ralplan/adapters.ts` | Embed ADR template in plan prompts |
-
-### Phase 4: Artifacts & Config
-
-| Task | File(s) | Description |
-|------|---------|-------------|
-| T-4.1 | `pi/extensions/ralplan/artifacts.ts` | Update filename generation for date-based naming |
-| T-4.2 | `pi/extensions/ralplan/index.ts` | Register new tools (`ralplan_create_worktree`) |
-| T-4.3 | Create `ralplan.config.ts` | Configuration file for worktree settings |
-
-### Phase 5: Testing
-
-| Task | File(s) | Description |
-|------|---------|-------------|
-| T-5.1 | `tests/naming.test.ts` | Unit tests for date formatting and filename generation |
-| T-5.2 | `tests/worktree.test.ts` | Unit tests for worktree operations |
-| T-5.3 | `tests/adr.test.ts` | Unit tests for ADR utilities |
-| T-5.4 | `tests/pipeline.test.ts` | Update existing pipeline tests for worktree integration |
+| Task  | File(s)                              | Description                                           |
+| ----- | ------------------------------------ | ----------------------------------------------------- |
+| T-1.1 | `worktree.ts`                        | Fix Windows path traversal in `sanitizeWorktreeName`  |
+| T-1.2 | `index.ts`                           | Add worktree creation to `before_agent_start` handler |
+| T-1.3 | `plan.md`, `spec.md`, `tech-spec.md` | Remove outdated `adr` references                      |
+| T-1.4 | `worktree.test.ts`                   | Add happy-path test for `createWorktree`              |
 
 ---
 
 ## 2. Dependency Graph
 
 ```
-Phase 1: Core Infrastructure (Independent)
-├── T-1.1 (naming.ts)      ← No dependencies
-├── T-1.2 (worktree.ts)    ← No dependencies
-└── T-1.3 (adr.ts)         ← No dependencies
-
-Phase 2: State Extension (Depends on Phase 1)
-└── T-2.1 (state.ts)       ← Uses naming, adr
-    └── T-2.2 (utils.ts)   ← Helper utilities
-
-Phase 3: Adapter Integration (Depends on Phase 1-2)
-└── T-3.1 → T-3.2 → T-3.3 (adapters.ts)
-
-Phase 4: Artifacts & Config (Depends on Phase 3)
-└── T-4.1 → T-4.2 → T-4.3
-
-Phase 5: Testing (Depends on Phase 1-4)
-└── T-5.1 → T-5.2 → T-5.3 → T-5.4
+T-1.1 (worktree.ts fix)    ← Independent
+T-1.3 (docs cleanup)       ← Independent
+T-1.2 (index.ts update)    ← Depends on T-1.1 (uses sanitizeWorktreeName)
+T-1.4 (test addition)      ← Depends on T-1.1 (tests the fix)
 ```
+
+All tasks are independent and can be implemented in parallel once the plan is approved.
 
 ---
 
-## 3. Exact File Implementations
+## 3. Implementation Details
 
-### T-1.1: `naming.ts`
+### T-1.1: Fix Windows Path Traversal
 
-```typescript
-import { format } from "node:date-fns";
+**File:** `pi/extensions/ralplan/worktree.ts`
 
-/** Format date as YYYY-MM-DD (ISO format) */
-export function formatDate(date: Date = new Date()): string {
-  return date.toISOString().split("T")[0]; // "YYYY-MM-DD"
-}
-
-/** Sanitize description for URL-safe filename */
-export function sanitizeDescription(desc: string): string {
-  return desc
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 50);
-}
-
-/** Generate plan filename with date */
-export function generatePlanFilename(description: string, date: Date = new Date()): string {
-  const dateStr = formatDate(date);
-  const slug = sanitizeDescription(description);
-  return `plan-${dateStr}-${slug}.md`;
-}
-
-/** Generate spec filename with date */
-export function generateSpecFilename(description: string, date: Date = new Date()): string {
-  const dateStr = formatDate(date);
-  const slug = sanitizeDescription(description);
-  return `spec-${dateStr}-${slug}.md`;
-}
-
-/** Resolve increment for date collision */
-export function resolveFilenameIncrement(baseName: string, counter: number): string {
-  if (counter === 0) return baseName;
-  const ext = baseName.endsWith(".md") ? ".md" : "";
-  const base = ext ? baseName.slice(0, -3) : baseName;
-  return `${base}-${counter}${ext}`;
-}
-```
-
-### T-1.2: `worktree.ts`
+**Current code (line 57-63):**
 
 ```typescript
-import { execSync } from "child_process";
-import { resolve, join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
-
-export interface WorktreeConfig {
-  baseBranch: string;       // Default: "main"
-  worktreeRoot: string;     // Default: "./worktrees"
-  createBranch: boolean;   // Default: true
-}
-
-export interface WorktreeResult {
-  success: boolean;
-  path?: string;
-  error?: string;
-}
-
-/** Sanitize worktree name for directory traversal */
 function sanitizeWorktreeName(name: string): string {
   // Block directory traversal and null bytes
   if (name.includes("..") || name.includes("\0")) {
@@ -147,310 +48,187 @@ function sanitizeWorktreeName(name: string): string {
   }
   return name.replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 50);
 }
-
-/** Validate worktree exists and is valid */
-function validateWorktree(path: string): boolean {
-  try {
-    const gitDir = join(path, ".git");
-    return existsSync(gitDir);
-  } catch {
-    return false;
-  }
-}
-
-export function createWorktree(config: WorktreeConfig, name: string): WorktreeResult {
-  const maxRetries = 3;
-  let lastError: string = "Unknown error";
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      // Ensure worktree root exists
-      mkdirSync(config.worktreeRoot, { recursive: true });
-
-      // Sanitize and resolve path
-      const sanitizedName = sanitizeWorktreeName(name);
-      const worktreePath = resolve(config.worktreeRoot, sanitizedName);
-
-      // Check if worktree already exists
-      if (existsSync(worktreePath)) {
-        if (validateWorktree(worktreePath)) {
-          return { success: true, path: worktreePath };
-        }
-        // Invalid existing worktree, treat as new
-      }
-
-      // Build git command
-      const baseBranch = config.baseBranch || "main";
-      if (config.createBranch) {
-        // Create new branch for worktree
-        execSync(
-          `git worktree add -b feature/${sanitizedName} "${worktreePath}" ${baseBranch}`,
-          { stdio: "pipe", shell: "/bin/bash" }
-        );
-      } else {
-        // Use existing branch/commit
-        execSync(
-          `git worktree add "${worktreePath}" ${baseBranch}`,
-          { stdio: "pipe", shell: "/bin/bash" }
-        );
-      }
-
-      // Validate created worktree
-      if (!validateWorktree(worktreePath)) {
-        return { success: false, error: "Worktree created but validation failed" };
-      }
-
-      return { success: true, path: worktreePath };
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : "Unknown error";
-      if (attempt < maxRetries - 1) {
-        // Exponential backoff: 100ms, 200ms, 400ms
-        const delay = 100 * Math.pow(2, attempt);
-        try {
-          execSync(`sleep ${delay / 1000}`, { stdio: "pipe" });
-        } catch {
-          // Ignore sleep errors
-        }
-      }
-    }
-  }
-
-  return { success: false, error: `Failed after ${maxRetries} attempts: ${lastError}` };
-}
-
-export function listWorktrees(): string[] {
-  try {
-    const output = execSync("git worktree list --porcelain", { encoding: "utf-8" });
-    return output
-      .split("\n\n")
-      .map((entry) => {
-        const pathMatch = entry.match(/^worktree\s+(.+)$/m);
-        return pathMatch ? pathMatch[1].trim() : "";
-      })
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-export function cleanupWorktree(path: string): WorktreeResult {
-  try {
-    execSync(`git worktree remove "${path}"`, { stdio: "pipe", shell: "/bin/bash" });
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error"
-    };
-  }
-}
 ```
 
-### T-1.3: `adr.ts`
+**Fix — replace with:**
 
 ```typescript
-import { randomUUID } from "node:crypto";
-
-export type ADREntryType = "open-question" | "decision" | "approval" | "rejection";
-export type ADRStatus = "pending" | "approved" | "rejected";
-
-export interface ADREntry {
-  id: string;
-  type: ADREntryType;
-  title: string;
-  description: string;
-  status: ADRStatus;
-  author?: string;
-  timestamp: string;
-  reason?: string;  // For rejections
-}
-
-export interface ADR {
-  entries: ADREntry[];
-  addEntry(entry: Omit<ADREntry, "id" | "timestamp">): ADREntry;
-  approve(id: string, author: string): void;
-  reject(id: string, author: string, reason: string): void;
-  toMarkdown(): string;
-}
-
-function generateId(): string {
-  return `ADR-${randomUUID().slice(0, 8)}`;
-}
-
-export function createADR(): ADR {
-  const entries: ADREntry[] = [];
-
-  return {
-    entries,
-    addEntry(entry) {
-      const newEntry: ADREntry = {
-        ...entry,
-        id: generateId(),
-        timestamp: new Date().toISOString(),
-        status: entry.status ?? "pending",
-      };
-      entries.push(newEntry);
-      return newEntry;
-    },
-    approve(id, author) {
-      const entry = entries.find((e) => e.id === id);
-      if (entry) {
-        entry.status = "approved";
-        entry.author = author;
-        entry.timestamp = new Date().toISOString();
-      }
-    },
-    reject(id, author, reason) {
-      const entry = entries.find((e) => e.id === id);
-      if (entry) {
-        entry.status = "rejected";
-        entry.author = author;
-        entry.reason = reason;
-        entry.timestamp = new Date().toISOString();
-      }
-    },
-    toMarkdown() {
-      const lines = ["## Architecture Decision Record\n"];
-
-      const questions = entries.filter((e) => e.type === "open-question");
-      const decisions = entries.filter((e) => e.type === "decision");
-      const approvals = entries.filter((e) => e.type === "approval");
-      const rejections = entries.filter((e) => e.type === "rejection");
-
-      if (questions.length > 0) {
-        lines.push("### Open Questions\n");
-        for (const q of questions) {
-          const check = q.status === "pending" ? "[ ]" : "[x]";
-          lines.push(`- ${check} **${q.title}** — ${q.description}`);
-        }
-        lines.push("");
-      }
-
-      if (decisions.length > 0) {
-        lines.push("### Decisions\n");
-        for (const d of decisions) {
-          lines.push(`- **${d.title}** — ${d.description} [${d.status}]`);
-        }
-        lines.push("");
-      }
-
-      if (approvals.length > 0) {
-        lines.push("### Approvals\n");
-        for (const a of approvals) {
-          lines.push(`- ✓ **${a.title}** by ${a.author} at ${a.timestamp}`);
-        }
-        lines.push("");
-      }
-
-      if (rejections.length > 0) {
-        lines.push("### Rejections\n");
-        for (const r of rejections) {
-          lines.push(`- ✗ **${r.title}** by ${r.author}: ${r.reason}`);
-        }
-        lines.push("");
-      }
-
-      return lines.join("\n");
-    },
-  };
+function sanitizeWorktreeName(name: string): string {
+  // Block directory traversal, null bytes, and Windows-specific patterns
+  // Normalize backslashes to forward slashes for cross-platform check
+  const normalized = name.replace(/\\/g, "/").replace(/\0/g, "");
+  if (normalized.includes("..") || name.includes("\0")) {
+    throw new Error("Invalid worktree name: directory traversal detected");
+  }
+  // Block absolute paths and drive letters
+  if (normalized.startsWith("/") || /^[a-zA-Z]:/.test(normalized)) {
+    throw new Error("Invalid worktree name: absolute paths not allowed");
+  }
+  return normalized.replace(/[^a-zA-Z0-9_./-]/g, "-").slice(0, 50);
 }
 ```
 
 ---
 
-## 4. Acceptance Criteria per Task
+### T-1.2: Add Worktree Creation to Auto-Start Handler
 
-| Task | Criteria |
-|------|----------|
-| T-1.1 | `formatDate()` returns `YYYY-MM-DD`; `generatePlanFilename()` produces `plan-YYYY-MM-DD-slug.md` |
-| T-1.2 | `createWorktree()` creates worktree with sanitized name; handles existing worktrees; includes retry logic |
-| T-1.3 | ADR can add entries, approve/reject, and render to markdown with UUID-based IDs |
-| T-2.1 | State includes `worktreePath` and `adr` fields; `worktreePath` initialized to `undefined` at plan start |
-| T-3.1 | Planning stage creates worktree before showing prompts; fails gracefully on error |
-| T-3.2 | Prompts use date-based filenames |
-| T-3.3 | Plan template includes `## Architecture Decision Record` section |
-| T-4.1 | Artifacts use correct date-based filenames |
-| T-4.2 | Tool `ralplan_create_worktree` registered and functional |
-| T-4.3 | Config file for worktree settings created |
-| T-5.1-5.4 | All tests pass including new worktree integration tests |
+**File:** `pi/extensions/ralplan/index.ts`
+
+**Location:** In `before_agent_start` handler, BEFORE line `state = buildDefaultState(...)`
+
+**Insert this code:**
+
+```typescript
+// Create worktree for this session (same pattern as /ralplan command)
+const worktreeName =
+  idea
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40) || "plan";
+const worktreeRoot = resolveWorktreeRoot(sessionCwd);
+const worktreeConfig: WorktreeConfig = {
+  baseBranch: detectDefaultBranch(sessionCwd),
+  worktreeRoot,
+  createBranch: true,
+};
+
+let worktreePath: string | undefined;
+try {
+  const worktreeResult = createWorktree(worktreeConfig, worktreeName);
+  if (worktreeResult.success && worktreeResult.path) {
+    worktreePath = worktreeResult.path;
+    console.log(`[ralplan] Worktree created: ${worktreePath}`);
+  } else {
+    console.warn(`[ralplan] Worktree creation failed: ${worktreeResult.error}`);
+    ctx.ui.notify(
+      `Worktree creation failed: ${worktreeResult.error}`,
+      "warning",
+    );
+  }
+} catch (error) {
+  console.warn(`[ralplan] Worktree creation error: ${error}`);
+}
+
+// Build state
+state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
+state.worktreePath = worktreePath;
+```
+
+---
+
+### T-1.3: Remove `adr` References from Documentation
+
+**Files to update:**
+
+1. `plans/plan.md` — Remove references to `adr` in state context
+2. `plans/spec.md` — Remove references to `adr` in state context
+3. `plans/tech-spec.md` — Remove references to `adr` in state context
+
+**In each file, remove or replace references to:**
+
+- `adr?: ADR` in state interface descriptions
+- Tasks that mention "add adr to RalplanState"
+- ADR section entries about "ADR state persisted"
+
+**Note:** The actual code in `state.ts` and `index.ts` is already correct (no `adr` field) per ADR-0003. This task only updates documentation to match.
+
+---
+
+### T-1.4: Add Happy-Path Test for createWorktree
+
+**File:** `tests/worktree.test.ts`
+
+**Add this test:**
+
+```typescript
+it("should return success and valid path for successful worktree creation", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ralplan-happy-"));
+  const repo = join(dir, "repo");
+  mkdirSync(repo, { recursive: true });
+  const prev = cwd();
+
+  try {
+    chdir(repo);
+    execSync("git init -b main", { stdio: "pipe" });
+    execSync("git config user.email test@example.com", { stdio: "pipe" });
+    execSync("git config user.name test", { stdio: "pipe" });
+    writeFileSync("README.md", "x\n", "utf-8");
+    execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+
+    const worktreesDir = join(dir, "worktrees");
+    const result = createWorktree(
+      { baseBranch: "main", worktreeRoot: worktreesDir, createBranch: true },
+      "happy-test",
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.path).toBeDefined();
+    expect(result.error).toBeUndefined();
+    // Verify worktree is valid (contains .git)
+    expect(existsSync(join(result.path!, ".git"))).toBe(true);
+    // Verify correct branch was created
+    const branches = execSync("git branch", {
+      cwd: result.path,
+      encoding: "utf-8",
+    });
+    expect(branches).toContain("feature/happy-test");
+  } finally {
+    chdir(prev);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+```
+
+---
+
+## 4. Acceptance Criteria
+
+| Task  | Criteria                                                                                                                                                                              |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-1.1 | `sanitizeWorktreeName("foo\\..\\..\\etc")` throws; `sanitizeWorktreeName("C:\\")` throws; `sanitizeWorktreeName("/absolute")` throws; `sanitizeWorktreeName("//server/share")` throws |
+| T-1.2 | Using `--ralplan` flag creates worktree and stores path in state; failure triggers UI warning                                                                                         |
+| T-1.3 | `plans/plan.md`, `plans/spec.md`, `plans/tech-spec.md` have no references to `adr` in state context                                                                                   |
+| T-1.4 | `npm test` passes with new happy-path test                                                                                                                                            |
 
 ---
 
 ## 5. Risk Register
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Git not available | Low | High | Graceful error with clear message |
-| Worktree creation fails | Medium | Medium | Retry logic (3 attempts with backoff) |
-| Filename collision on same day | Low | Low | Append increment `-1`, `-2` |
-| Config file missing | High | Low | Use defaults, no hard failure |
-| ADR state not persisted | Medium | High | Include in `persistState()` |
-| Worktree orphaned on cancel | Medium | Medium | Add optional cleanup on cancel |
-| Concurrent sessions conflict | Low | Medium | Check for existing active session |
-| Transient git failures | Low | Medium | Retry with exponential backoff |
-| Directory traversal attack | Medium | High | Input sanitization in worktree.ts |
+| Risk                                   | Likelihood | Impact | Mitigation                                |
+| -------------------------------------- | ---------- | ------ | ----------------------------------------- |
+| Regex change breaks existing tests     | Low        | Medium | Run tests after change                    |
+| Worktree creation timeout              | Low        | Low    | createWorktree has 3-retry internal logic |
+| Documentation update missed references | Medium     | Low    | Use grep to verify all references removed |
+| Test CWD pollution                     | Low        | Low    | Use try/finally to restore CWD            |
 
 ---
 
 ## 6. Architecture Decision Record (ADR)
 
-### Open Questions
-
-- [x] **Q1: When to create worktree?** — At planning start vs. execution start
-  - **Decision:** Create at planning start per user intent "start the new plans in the new worktree"
-  - **Status:** APPROVED
-  - **Rationale:** Isolates the planning work from main repo immediately
-
-- [x] **Q2: What if worktree creation fails?**
-  - **Decision:** Retry 3 times with backoff, then hard fail with clear error
-  - **Status:** APPROVED
-  - **Rationale:** Transient failures should be retried; persistent failures need user attention
-
-- [x] **Q3: Worktree branch creation?**
-  - **Decision:** Create new feature branch by default, configurable
-  - **Status:** APPROVED
-  - **Rationale:** Aligns with typical feature development workflow
-
 ### Decisions
 
-- [x] **D1: Worktree root location** — `./worktrees/` within main repo
-  - **Rationale:** Keeps everything in one repo, easy cleanup, industry-standard structure
-  - **Consequences:** Worktrees visible in main repo, requires `.gitignore` updates
+- [x] **D1: Normalize backslashes before check** — Normalize `\` to `/` in `sanitizeWorktreeName` to catch Windows traversal on all platforms
+  - Rationale: Cross-platform consistency, simpler validation
+  - Consequence: Unix paths with `\` are also normalized (acceptable)
 
-- [x] **D2: Base branch** — Configurable, default "main"
-  - **Rationale:** Industry default, allows override for legacy repos
-  - **Consequences:** Config file needed for non-standard repos
+- [x] **D2: Auto-start worktree uses same config as commands** — Reuse existing `createWorktree()` with `createBranch: true`
+  - Rationale: Consistency across all entry points
+  - Consequence: All worktrees create feature branches
 
-- [x] **D3: ADR embedded in plan** — Not separate files
-  - **Rationale:** Keeps related content together, simpler tracking, single source of truth
-  - **Consequences:** Plan files may grow large with many ADR entries
-
-- [x] **D4: ID generation** — Use `crypto.randomUUID()`
-  - **Rationale:** Guaranteed unique, no counter collision, session-persistent
-  - **Consequences:** IDs are not sequential but this is not a requirement
-
-- [x] **D5: Security** — Sanitize all user input before shell commands
-  - **Rationale:** Prevent directory traversal and command injection
-  - **Consequences:** Slight overhead but required for safety
+- [x] **D3: UI notification on worktree failure** — Add `ctx.ui.notify()` when worktree creation fails
+  - Rationale: User should know when worktree creation fails
+  - Consequence: Minor code addition, no behavioral change
 
 ### Approvals
 
-- ✅ **A1: Implementation approach** — Approved by Architect
-  - Architect confirmed technical feasibility with noted revisions
-  - Branch naming, ID generation, path resolution issues addressed
+- ✅ **A1:** Architect approved T-1.1, T-1.2, T-1.3, T-1.4 technical approach
+- ✅ **A2:** Critic noted improvements but did not block (Architect verdict takes precedence)
 
-- ✅ **A2: Edge case handling** — Approved by Critic
-  - Retry logic, validation, and security measures confirmed adequate
-  - Minor cleanup on cancel flagged but not blocking
+---
 
-### Rejections
+## 7. Notes
 
-- ❌ **R1: Use YAML for ADR** — Rejected
-  - **Reason:** Markdown is more human-readable, integrates with existing plan format
-  - **Rejected by:** Architect
-  - **Date:** 2026-05-05
-
-- ❌ **R2: Use Docker for isolation** — Rejected
-  - **Reason:** Overkill for planning tool; git worktrees are native and lightweight
-  - **Rejected by:** Architect
-  - **Date:** 2026-05-05
+- **T-1.1 and T-1.4 are related**: The happy-path test (T-1.4) validates the fix from T-1.1
+- **T-1.3 is documentation only**: No code changes required for ADR-0003 cleanup
+- **Parallel implementation**: T-1.1 and T-1.3 are independent and can be implemented simultaneously
