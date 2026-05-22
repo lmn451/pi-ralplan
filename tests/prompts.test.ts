@@ -55,6 +55,7 @@ describe("RALPLAN-DR summary template", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "add user authentication",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -69,6 +70,7 @@ describe("RALPLAN-DR summary template", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "add JWT authentication",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -84,6 +86,7 @@ describe("RALPLAN-DR summary template", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "database migration to postgres",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -97,6 +100,7 @@ describe("RALPLAN-DR summary template", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "add dark mode toggle",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -110,6 +114,7 @@ describe("RALPLAN-DR summary template", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "add caching layer",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -127,6 +132,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const prompt = getConsensusPlanningPrompt({
       idea: "add feature",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -139,6 +145,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const prompt = getConsensusPlanningPrompt({
       idea: "add feature",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -152,6 +159,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const prompt = getConsensusPlanningPrompt({
       idea: "add feature",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -163,6 +171,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const prompt = getConsensusPlanningPrompt({
       idea: "add feature",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -179,6 +188,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const prompt = getConsensusPlanningPrompt({
       idea: "add feature",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       specPath: "plans/spec.md",
       planPath: "plans/plan.md",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
@@ -192,6 +202,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const prompt = getConsensusPlanningPrompt({
       idea: "add feature",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -204,6 +215,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "add security audit",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
@@ -214,6 +226,7 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     const consensusPrompt = getConsensusPlanningPrompt({
       idea: "add security audit",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
       mode: "ralplan",
     });
