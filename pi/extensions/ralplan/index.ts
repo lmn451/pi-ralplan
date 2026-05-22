@@ -1213,6 +1213,23 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
   // Handle turn_end for iteration counting
   pi.on("turn_end", async (_event, ctx) => {
     if (!isActive() || !state) return;
+
+    // Check if max iterations reached before incrementing
+    const currentStage =
+      state.pipeline.stages[state.pipeline.currentStageIndex];
+    const maxIters =
+      state.pipeline.pipelineConfig.verification &&
+      typeof state.pipeline.pipelineConfig.verification === "object"
+        ? (state.pipeline.pipelineConfig.verification.maxIterations ?? 100)
+        : 100;
+    if (currentStage.iterations >= maxIters) {
+      ctx.ui.notify(
+        `Maximum iterations (${maxIters}) reached for ${currentStage.id}. Please review and manually approve or use /ralplan:skip to proceed.`,
+        "warning",
+      );
+      return; // Don't increment or process signals — escalate to user
+    }
+
     state.pipeline = incrementStageIteration(state.pipeline);
     persistState();
     updateUI(ctx);

@@ -135,8 +135,10 @@ export function createWorktree(
       }
 
       // Validate and sanitize baseBranch
+      // Note: / is allowed for branch paths like feature/my-branch
       const baseBranch = config.baseBranch || DEFAULT_BASE_BRANCH;
-      if (!/^[a-zA-Z0-9._\/-]+$/.test(baseBranch)) {
+      const baseBranchPattern = /^[a-zA-Z0-9._-]+(\/[a-zA-Z0-9._-]+)*$/;
+      if (!baseBranchPattern.test(baseBranch)) {
         throw new Error(`Invalid baseBranch: ${baseBranch}`);
       }
 
