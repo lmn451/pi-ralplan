@@ -40,7 +40,6 @@ function generateWorktreeName(idea: string): string {
   return sanitized || "plan";
 }
 
-/** Get worktree creation prompt section */
 function getWorktreeCreationSection(context: PipelineContext): string {
   const worktreeName = generateWorktreeName(context.idea);
   const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
@@ -55,6 +54,10 @@ Before planning begins, a new Git worktree will be created for this plan.
 - **Base Branch:** main (configurable)
 
 The worktree isolates this plan's work from the main repository.
+
+**YOUR WORKING DIRECTORY:** \`${worktreeRoot}/${worktreeName}\`
+All planning artifacts (spec, plan, open-questions, answers) MUST be saved relative to this directory.
+Do NOT save any files in the original repository directory.
 `;
 }
 
@@ -211,7 +214,14 @@ export const executionAdapter: PipelineStageAdapter = {
 
   getPrompt(context: PipelineContext): string {
     const planPath = context.planPath || "plans/plan.md";
-    return getExecutionPrompt(planPath, context.config.execution === "team");
+    const cwdNote =
+      context.cwd !== context.directory
+        ? `\n\n**Working Directory:** All work MUST happen in \`${context.cwd}\`.\n`
+        : "\n";
+    return (
+      getExecutionPrompt(planPath, context.config.execution === "team") +
+      cwdNote
+    );
   },
 };
 
@@ -230,7 +240,11 @@ export const ralphAdapter: PipelineStageAdapter = {
       context.config.verification !== false
         ? context.config.verification.maxIterations
         : 100;
-    return getRalphPrompt(specPath, maxIterations);
+    const cwdNote =
+      context.cwd !== context.directory
+        ? `\n\n**Working Directory:** All verification MUST happen in \`${context.cwd}\`.\n`
+        : "\n";
+    return getRalphPrompt(specPath, maxIterations) + cwdNote;
   },
 };
 

@@ -7,9 +7,19 @@ import { nowISO } from "./utils.js";
 export type PipelineStageId = "ralplan" | "execution" | "ralph" | "qa";
 export type PipelineTerminalState = "complete" | "failed" | "cancelled";
 export type PipelinePhase = PipelineStageId | PipelineTerminalState;
-export type StageStatus = "pending" | "active" | "complete" | "failed" | "skipped";
+export type StageStatus =
+  | "pending"
+  | "active"
+  | "complete"
+  | "failed"
+  | "skipped";
 
-export const STAGE_ORDER: readonly PipelineStageId[] = ["ralplan", "execution", "ralph", "qa"] as const;
+export const STAGE_ORDER: readonly PipelineStageId[] = [
+  "ralplan",
+  "execution",
+  "ralph",
+  "qa",
+] as const;
 
 export type ExecutionBackend = "team" | "solo";
 
@@ -35,6 +45,7 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
 export interface PipelineContext {
   idea: string;
   directory: string;
+  cwd: string; // Explicit working directory — set to worktreePath when available, else sessionCwd
   sessionId?: string;
   specPath?: string;
   planPath?: string;
@@ -76,7 +87,9 @@ export interface PipelineStageAdapter {
 
 let _adapters: readonly PipelineStageAdapter[] = [];
 
-export function registerAdapters(adapters: readonly PipelineStageAdapter[]): void {
+export function registerAdapters(
+  adapters: readonly PipelineStageAdapter[],
+): void {
   _adapters = adapters;
 }
 
@@ -84,7 +97,9 @@ export function getAdapterById(id: string): PipelineStageAdapter | undefined {
   return _adapters.find((a) => a.id === id);
 }
 
-export function getActiveAdapters(config: PipelineConfig): PipelineStageAdapter[] {
+export function getActiveAdapters(
+  config: PipelineConfig,
+): PipelineStageAdapter[] {
   return _adapters.filter((adapter) => !adapter.shouldSkip(config));
 }
 
@@ -92,13 +107,18 @@ export function getActiveAdapters(config: PipelineConfig): PipelineStageAdapter[
 // CONFIG RESOLUTION
 // ============================================================================
 
-export function resolvePipelineConfig(userConfig?: Partial<PipelineConfig>): PipelineConfig {
+export function resolvePipelineConfig(
+  userConfig?: Partial<PipelineConfig>,
+): PipelineConfig {
   const config = { ...DEFAULT_PIPELINE_CONFIG };
 
   if (userConfig) {
-    if (userConfig.planning !== undefined) config.planning = userConfig.planning;
-    if (userConfig.execution !== undefined) config.execution = userConfig.execution;
-    if (userConfig.verification !== undefined) config.verification = userConfig.verification;
+    if (userConfig.planning !== undefined)
+      config.planning = userConfig.planning;
+    if (userConfig.execution !== undefined)
+      config.execution = userConfig.execution;
+    if (userConfig.verification !== undefined)
+      config.verification = userConfig.verification;
     if (userConfig.qa !== undefined) config.qa = userConfig.qa;
   }
 
@@ -109,13 +129,17 @@ export function resolvePipelineConfig(userConfig?: Partial<PipelineConfig>): Pip
 // PIPELINE TRACKING
 // ============================================================================
 
-export function buildPipelineTracking(config: PipelineConfig): PipelineTracking {
+export function buildPipelineTracking(
+  config: PipelineConfig,
+): PipelineTracking {
   const stages: PipelineStageState[] = STAGE_ORDER.map((stageId) => {
     const adapter = getAdapterById(stageId);
     const isActive = adapter && !adapter.shouldSkip(config);
     return {
       id: stageId,
-      status: isActive ? ("pending" as StageStatus) : ("skipped" as StageStatus),
+      status: isActive
+        ? ("pending" as StageStatus)
+        : ("skipped" as StageStatus),
       iterations: 0,
     };
   });
@@ -129,14 +153,20 @@ export function buildPipelineTracking(config: PipelineConfig): PipelineTracking 
   };
 }
 
-export function syncTrackingToConfig(tracking: PipelineTracking): PipelineTracking {
+export function syncTrackingToConfig(
+  tracking: PipelineTracking,
+): PipelineTracking {
   const { stages, currentStageIndex, pipelineConfig } = tracking;
 
   for (let i = 0; i < stages.length; i++) {
     if (i <= currentStageIndex) continue;
 
     const stage = stages[i];
-    if (stage.status === "complete" || stage.status === "failed" || stage.status === "active") {
+    if (
+      stage.status === "complete" ||
+      stage.status === "failed" ||
+      stage.status === "active"
+    ) {
       continue;
     }
 
@@ -161,7 +191,9 @@ export function syncTrackingToConfig(tracking: PipelineTracking): PipelineTracki
 // STAGE TRANSITIONS
 // ============================================================================
 
-export function getCurrentStageAdapter(tracking: PipelineTracking): PipelineStageAdapter | null {
+export function getCurrentStageAdapter(
+  tracking: PipelineTracking,
+): PipelineStageAdapter | null {
   const { stages, currentStageIndex } = tracking;
   if (currentStageIndex < 0 || currentStageIndex >= stages.length) return null;
 
@@ -172,7 +204,9 @@ export function getCurrentStageAdapter(tracking: PipelineTracking): PipelineStag
   return getAdapterById(currentStage.id) ?? null;
 }
 
-export function getNextStageAdapter(tracking: PipelineTracking): PipelineStageAdapter | null {
+export function getNextStageAdapter(
+  tracking: PipelineTracking,
+): PipelineStageAdapter | null {
   const { stages, currentStageIndex } = tracking;
   for (let i = currentStageIndex + 1; i < stages.length; i++) {
     if (stages[i].status !== "skipped") {
@@ -223,7 +257,8 @@ export function advanceStage(
   const nextAdapter = getAdapterById(stages[nextIndex].id);
   if (!nextAdapter) {
     stages[nextIndex].status = "failed";
-    stages[nextIndex].error = `No adapter registered for stage "${stages[nextIndex].id}"`;
+    stages[nextIndex].error =
+      `No adapter registered for stage "${stages[nextIndex].id}"`;
     return { adapter: null, phase: "failed", tracking };
   }
 
@@ -275,7 +310,8 @@ export function skipCurrentStage(
   const nextAdapter = getAdapterById(stages[nextIndex].id);
   if (!nextAdapter) {
     stages[nextIndex].status = "failed";
-    stages[nextIndex].error = `No adapter registered for stage "${stages[nextIndex].id}"`;
+    stages[nextIndex].error =
+      `No adapter registered for stage "${stages[nextIndex].id}"`;
     return { adapter: null, phase: "failed", tracking };
   }
 
@@ -286,7 +322,10 @@ export function skipCurrentStage(
   return { adapter: nextAdapter, phase: stages[nextIndex].id, tracking };
 }
 
-export function failCurrentStage(tracking: PipelineTracking, error: string): PipelineTracking {
+export function failCurrentStage(
+  tracking: PipelineTracking,
+  error: string,
+): PipelineTracking {
   const { stages, currentStageIndex } = tracking;
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
     stages[currentStageIndex].status = "failed";
@@ -295,7 +334,9 @@ export function failCurrentStage(tracking: PipelineTracking, error: string): Pip
   return tracking;
 }
 
-export function incrementStageIteration(tracking: PipelineTracking): PipelineTracking {
+export function incrementStageIteration(
+  tracking: PipelineTracking,
+): PipelineTracking {
   const { stages, currentStageIndex } = tracking;
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
     stages[currentStageIndex].iterations++;

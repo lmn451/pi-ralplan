@@ -34,6 +34,7 @@ describe("prompts use dynamic artifact paths", () => {
     const prompt = getConsensusPlanningPrompt({
       idea: "demo",
       directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
       specPath,
       planPath,
       openQuestionsPath: "/tmp/worktree/plans/open-questions.md",

@@ -1,23 +1,80 @@
 import { describe, it, expect } from "vitest";
-import { detectSignal, getExpectedSignal, getLastAssistantText } from "../pi/extensions/ralplan/signals.js";
+import {
+  detectSignal,
+  getExpectedSignal,
+  getLastAssistantText,
+} from "../pi/extensions/ralplan/signals.js";
 
 describe("detectSignal", () => {
   it("detects ralplan completion signal", () => {
-    expect(detectSignal("Done! PIPELINE_RALPLAN_COMPLETE", "ralplan")).toBe(true);
+    expect(detectSignal("Done! PIPELINE_RALPLAN_COMPLETE", "ralplan")).toBe(
+      true,
+    );
     expect(detectSignal("Done!", "ralplan")).toBe(false);
   });
 
   it("detects execution completion signal", () => {
-    expect(detectSignal("All tasks done. PIPELINE_EXECUTION_COMPLETE", "execution")).toBe(true);
+    expect(
+      detectSignal("All tasks done. PIPELINE_EXECUTION_COMPLETE", "execution"),
+    ).toBe(true);
     expect(detectSignal("Still working...", "execution")).toBe(false);
   });
 
   it("detects ralph completion signal", () => {
-    expect(detectSignal("Approved. PIPELINE_RALPH_COMPLETE", "ralph")).toBe(true);
+    expect(detectSignal("Approved. PIPELINE_RALPH_COMPLETE", "ralph")).toBe(
+      true,
+    );
   });
 
   it("detects qa completion signal", () => {
     expect(detectSignal("Tests pass. PIPELINE_QA_COMPLETE", "qa")).toBe(true);
+  });
+
+  it("rejects signal in single-line comment", () => {
+    expect(
+      detectSignal(
+        "// TODO: add PIPELINE_RALPLAN_COMPLETE when done",
+        "ralplan",
+      ),
+    ).toBe(false);
+    expect(
+      detectSignal(
+        "# remember to signal PIPELINE_RALPLAN_COMPLETE here",
+        "ralplan",
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects signal in code block", () => {
+    expect(detectSignal("```\nPIPELINE_RALPLAN_COMPLETE\n```", "ralplan")).toBe(
+      false,
+    );
+    expect(
+      detectSignal(
+        "```js\nconsole.log('PIPELINE_RALPLAN_COMPLETE');\n```",
+        "ralplan",
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects signal in inline code", () => {
+    expect(detectSignal("`PIPELINE_RALPLAN_COMPLETE`", "ralplan")).toBe(false);
+  });
+
+  it("accepts signal on its own line", () => {
+    expect(detectSignal("PIPELINE_RALPLAN_COMPLETE", "ralplan")).toBe(true);
+    expect(detectSignal("Done!\nPIPELINE_RALPLAN_COMPLETE\n", "ralplan")).toBe(
+      true,
+    );
+  });
+
+  it("accepts signal embedded in plain text", () => {
+    expect(
+      detectSignal(
+        "Ready to proceed. PIPELINE_RALPLAN_COMPLETE after this.",
+        "ralplan",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -46,7 +103,13 @@ describe("getLastAssistantText", () => {
   it("extracts text from array content", () => {
     const messages = [
       { role: "user", content: "hello" },
-      { role: "assistant", content: [{ type: "text", text: "foo" }, { type: "text", text: "bar" }] },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "foo" },
+          { type: "text", text: "bar" },
+        ],
+      },
     ];
     expect(getLastAssistantText(messages)).toBe("foo\nbar");
   });
@@ -55,7 +118,10 @@ describe("getLastAssistantText", () => {
     const messages = [
       {
         role: "assistant",
-        content: [{ type: "tool_use", name: "bash" }, { type: "text", text: "result" }],
+        content: [
+          { type: "tool_use", name: "bash" },
+          { type: "text", text: "result" },
+        ],
       },
     ];
     expect(getLastAssistantText(messages)).toBe("result");

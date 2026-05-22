@@ -144,6 +144,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     return {
       idea: state.originalIdea,
       directory: getWorkspaceDir(),
+      cwd: getWorkspaceDir(), // Explicit cwd — set to worktreePath when available
       sessionId: state.sessionId,
       specPath: toWorkspacePath(state.specPath),
       planPath: toWorkspacePath(state.planPath),
@@ -177,6 +178,20 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
 
   function deactivateState(): void {
     if (state) {
+      // Best-effort worktree cleanup — warn but don't block deactivation
+      if (state.worktreePath) {
+        try {
+          const { cleanupWorktree } = require("./worktree.js");
+          const result = cleanupWorktree(state.worktreePath);
+          if (!result.success) {
+            console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
+          } else {
+            console.log(`[ralplan] Worktree cleaned up: ${state.worktreePath}`);
+          }
+        } catch {
+          // cleanup not available or already removed
+        }
+      }
       state.active = false;
       state.completedAt = new Date().toISOString();
       persistState();
