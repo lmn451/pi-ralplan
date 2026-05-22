@@ -881,8 +881,10 @@ ${prompt}`,
       .some((e) => e.type === "custom" && e.customType === CUSTOM_TYPE);
 
     if (!isActive() && autoStartMode !== null && !hasRalplanState) {
+      // Capture mode and clear flag BEFORE any async work to prevent race
+      // where two concurrent events could both enter this block
       const mode = autoStartMode;
-      autoStartMode = null; // Only auto-start once
+      autoStartMode = null; // Prevent any other event from entering
 
       const idea = event.prompt.trim() || "Implement the requested feature";
       const config = resolvePipelineConfig();
