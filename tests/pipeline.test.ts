@@ -252,7 +252,12 @@ describe("advanceStage", () => {
     const tracking = buildPipelineTracking(config);
     tracking.stages[0].status = "active";
 
-    const ctx: PipelineContext = { idea: "test", directory: "/tmp", config };
+    const ctx: PipelineContext = {
+      idea: "test",
+      directory: "/tmp",
+      cwd: "/tmp",
+      config,
+    };
     advanceStage(tracking, ctx);
 
     expect(exited).toContain("ralplan-exit");
