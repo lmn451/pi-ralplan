@@ -31,13 +31,16 @@ export function resolveOpenQuestionsPath(directory: string): string {
 /** Resolve the worktree root directory (sibling to repo, not inside) */
 export function resolveWorktreeRoot(directory: string): string {
   const parent = dirname(directory);
-  const name = basename(directory);
+  // Sanitize name to prevent nested worktree roots (e.g., if directory has / in name)
+  const name = basename(directory).replace(/[\/\\]/g, "-");
   return join(parent, `${name}-worktrees`);
 }
 
 /** Resolve a specific worktree path */
 export function resolveWorktreePath(directory: string, name: string): string {
-  return join(resolveWorktreeRoot(directory), name);
+  // Sanitize name to prevent nested worktree roots
+  const sanitizedName = name.replace(/[\/\\]/g, "-");
+  return join(resolveWorktreeRoot(directory), sanitizedName);
 }
 
 /** Escape special characters for embedding in prompts */

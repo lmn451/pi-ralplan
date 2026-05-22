@@ -89,6 +89,7 @@ When the spec is saved, signal: EXPANSION_COMPLETE`;
 export function getDirectPlanningPrompt(
   specPath: string,
   planPath: string,
+  maxIterations: number = 100,
 ): string {
   return `## DIRECT PLANNING
 
@@ -159,7 +160,7 @@ Verdict: OKAY or REJECT with specific issues"
 
 ### Iteration Loop
 
-If Critic rejects, feed feedback back to Architect and retry (max 5 iterations).
+If Critic rejects, feed feedback back to Architect and retry (up to ${maxIterations} iterations).
 
 When Critic approves: PLANNING_COMPLETE`;
 }
@@ -390,7 +391,7 @@ After the spec is created at \`${specPath}\`, invoke the RALPLAN consensus workf
 1. **Planner** creates initial implementation plan from the spec
 2. **Architect** reviews for technical feasibility and design quality
 3. **Critic** challenges assumptions and identifies gaps
-4. Iterate until consensus is reached
+4. Iterate until consensus is reached (up to ${context.config.verification !== false ? context.config.verification.maxIterations : 100} iterations)
 
 Save the final approved plan to: \`${planPath}\`
 

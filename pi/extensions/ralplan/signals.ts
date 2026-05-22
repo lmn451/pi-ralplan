@@ -16,6 +16,21 @@ export const CONSENSUS_APPROVED = "CONSENSUS_APPROVED";
 export const CONSENSUS_REJECTED = "CONSENSUS_REJECTED";
 
 /**
+ * Detect if a consensus signal (APPROVED/REJECTED) is present in text.
+ * Uses same boundary-aware detection as other signals.
+ */
+export function detectConsensusSignal(text: string, signal: string): boolean {
+  if (!signal) return false;
+  const nonCodeSegments = splitByCodeBlocks(text);
+  for (const segment of nonCodeSegments) {
+    if (containsBoundaryAwareSignal(segment, signal)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Escape special regex characters in a string
  */
 export function escapeRegex(str: string): string {
