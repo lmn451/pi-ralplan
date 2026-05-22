@@ -369,12 +369,66 @@ When all reviewers approve:
 Signal: ${RALPH_COMPLETION_SIGNAL}`;
 }
 
+/** RALPLAN-DR summary format for the Planner to generate */
+export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
+  const deliberateSignals = [
+    "auth", "security", "credential", "secret", "password", "token",
+    "migration", "schema", "database", "production",
+    "destroy", "delete", "rm",
+    "compliance", "PII", "GDPR", "HIPAA",
+    "public API", "breaking change",
+  ];
+  const idea = context.idea.toLowerCase();
+  const isDeliberate = deliberateSignals.some(s => idea.includes(s));
+
+  return `
+### RALPLAN-DR Summary (REQUIRED — generate before Architect review)
+
+**Mode:** ${isDeliberate ? "DELIBERATE (high-risk signals detected)" : "SHORT (default)"}
+
+### Principles (3–5)
+- [P1] Principle
+- [P2] Principle
+- [P3] Principle
+
+### Top 3 Decision Drivers
+1. [Driver name] — [why this drives the decision]
+2. [Driver name] — [why this drives the decision]
+3. [Driver name] — [why this drives the decision]
+
+### Viable Options (≥2 required)
+**Option A:** [name]
+- Pros: ...
+- Cons: ...
+**Option B:** [name]
+- Pros: ...
+- Cons: ...
+
+*(If only 1 option: explicit invalidation of alternatives)*
+
+${isDeliberate ? `### Pre-Mortem (3 failure scenarios)
+- **Scenario 1:** [How it fails] → Mitigation: [...]
+- **Scenario 2:** [How it fails] → Mitigation: [...]
+- **Scenario 3:** [How it fails] → Mitigation: [...]
+
+### Expanded Test Plan
+- Unit tests: [...]
+- Integration tests: [...]
+- E2E tests: [...]
+- Observability: [...]` : ''}
+`;
+}
+
 /** Generate the consensus planning prompt (full ralplan mode) */
 export function getConsensusPlanningPrompt(context: PipelineContext): string {
   const specPath = context.specPath || "plans/spec.md";
   const planPath = context.planPath || "plans/plan.md";
 
+  const drSummary = getRalplanDRSummaryTemplate(context);
+
   return `## RALPLAN (Consensus Planning)
+
+**BE BRIEF.** Concise reasoning, no filler.
 
 Your task: Expand the idea into a detailed spec and implementation plan using consensus-driven planning.
 
@@ -389,13 +443,66 @@ ${getExpansionPrompt(context.idea, specPath, context.openQuestionsPath)}
 After the spec is created at \`${specPath}\`, invoke the RALPLAN consensus workflow:
 
 1. **Planner** creates initial implementation plan from the spec
-2. **Architect** reviews for technical feasibility and design quality
+2. **Architect** reviews for technical feasibility and design quality (SEQUENTIAL — await before Critic)
 3. **Critic** challenges assumptions and identifies gaps
 4. Iterate until consensus is reached (up to ${context.config.verification !== false ? context.config.verification.maxIterations : 100} iterations)
 
+${drSummary}
+
+Save the plan draft (with RALPLAN-DR Summary) to: \`plans/drafts/plan_draft.md\`
 Save the final approved plan to: \`${planPath}\`
 
 Use the \`/skill:ralplan\` skill for detailed consensus workflow instructions.
+
+### Architect Review: SEQUENTIAL
+
+Do NOT run Architect and Critic in parallel. Wait for Architect's full verdict before spawning Critic.
+
+Architect verdict: \`APPROVED\` | \`REVISION NEEDED\`
+
+### Critic Review
+
+Critic verdict: \`APPROVE\` | \`ITERATE\` | \`REJECT\`
+
+Critic MUST enforce:
+- Principle-option consistency
+- Fair alternatives (no shallow rejections)
+- Risk mitigation clarity
+- Testable acceptance criteria
+- DELIBERATE mode: Reject missing pre-mortem or expanded test plan
+
+### Iteration Loop (max 5)
+
+Any non-APPROVE verdict → Planner revises → Architect reviews (SEQUENTIAL) → Critic evaluates → repeat.
+
+### Final Plan ADR Format
+
+When Critic approves, save \`${planPath}\` with this ADR section:
+
+\`\`\`markdown
+## Architecture Decision Record (ADR)
+
+### Decision
+[One-sentence decision statement]
+
+### Drivers
+- [Driver 1]
+- [Driver 2]
+
+### Alternatives Considered
+- **Option A** — rejected because [reason]
+- **Option B** — rejected because [reason]
+
+### Why Chosen
+[Paragraph explaining why this path was selected]
+
+### Consequences
+- **Positive:** [Benefits]
+- **Negative:** [Trade-offs and risks]
+
+### Follow-ups
+- [ ] [Follow-up action]
+\`\`\`
 
 ### Completion
 
