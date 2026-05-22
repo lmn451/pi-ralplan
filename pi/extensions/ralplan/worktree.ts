@@ -86,6 +86,8 @@ export function validateWorktree(path: string): boolean {
         const gitdirPath = match[1].trim();
         // Resolve relative paths from the .git file's directory
         const resolvedGitdir = resolve(dirname(gitDir), gitdirPath);
+        // Note: git worktree add validates paths, so any gitdir path here
+        // was already approved by git. We just verify the target exists.
         return existsSync(resolvedGitdir);
       }
     } catch {
