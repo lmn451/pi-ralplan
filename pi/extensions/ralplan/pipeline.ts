@@ -54,6 +54,7 @@ export interface PipelineContext {
   config: PipelineConfig;
   mode?: "ralplan" | "brainstorm";
   brainstorm?: import("./brainstorm.js").BrainstormState;
+  worktreePath?: string; // Associated worktree path (set during execution entry)
 }
 
 export interface PipelineStageState {

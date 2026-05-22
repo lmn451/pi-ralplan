@@ -268,6 +268,8 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         startedAt:
           data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
       };
+      // Prevent auto-start logic from firing on a resumed session
+      autoStartMode = null;
       return;
     }
 
@@ -893,7 +895,13 @@ ${prompt}`,
       }
     }
 
-    if (!isActive() && autoStartMode !== null) {
+    // Skip auto-start if session already has ralplan state (prevents race
+    // between session resume and auto-start when --ralplan flag is present)
+    const hasRalplanState = ctx.sessionManager
+      .getEntries()
+      .some((e) => e.type === "custom" && e.customType === CUSTOM_TYPE);
+
+    if (!isActive() && autoStartMode !== null && !hasRalplanState) {
       const mode = autoStartMode;
       autoStartMode = null; // Only auto-start once
 
