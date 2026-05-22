@@ -62,7 +62,7 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
     if (
       typeof parsed.active !== "boolean" ||
       typeof parsed.pipeline !== "object" ||
-      !Array.isArray(parsed.pipeline?.stages) ||
+      !Array.isArray((parsed.pipeline as Record<string, unknown>)?.stages) ||
       (parsed.sessionId != null && typeof parsed.sessionId !== "string") ||
       typeof parsed.mode !== "string"
     ) {

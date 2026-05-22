@@ -36,7 +36,7 @@ function createStubPi() {
       tools.set(def.name, def);
     },
     appendEntry() {},
-    sendMessage() {},
+    sendMessage(_msg?: unknown) {},
     sendUserMessage() {},
     on() {},
     getFlag() {
@@ -94,7 +94,7 @@ describe("ralplan extension command handlers", () => {
           .find(
             (e: any) => e.type === "custom" && e.customType === "ralplan-state",
           );
-        const worktreePath = ralplanEntry?.data?.worktreePath as
+        const worktreePath = (ralplanEntry?.data as any)?.worktreePath as
           | string
           | undefined;
 
@@ -199,9 +199,9 @@ describe("ralplan extension command handlers", () => {
           .find(
             (e: any) => e.type === "custom" && e.customType === "ralplan-state",
           );
-        const initialStageIndex = initialEntry?.data?.tracking
+        const initialStageIndex = (initialEntry?.data as any)?.tracking
           ?.currentStageIndex as number;
-        const initialStageCount = (initialEntry?.data?.tracking?.stages
+        const initialStageCount = ((initialEntry?.data as any)?.tracking?.stages
           ?.length ?? 0) as number;
 
         // Skip the current stage
@@ -214,7 +214,7 @@ describe("ralplan extension command handlers", () => {
           .find(
             (e: any) => e.type === "custom" && e.customType === "ralplan-state",
           );
-        const newStageIndex = updatedEntry?.data?.tracking
+        const newStageIndex = (updatedEntry?.data as any)?.tracking
           ?.currentStageIndex as number;
 
         // Stage index should have advanced or pipeline complete
@@ -223,7 +223,7 @@ describe("ralplan extension command handlers", () => {
         }
 
         // Either stage was skipped or we're at end of pipeline
-        const stages = updatedEntry?.data?.tracking?.stages as Array<{
+        const stages = (updatedEntry?.data as any)?.tracking?.stages as Array<{
           id: string;
           status: string;
         }>;
