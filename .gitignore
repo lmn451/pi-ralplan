@@ -1,3 +1,7 @@
 # Pi runtime state and generated content
 .pi/
 plans/
+
+# Logs and session files
+logs/
+*.jsonl
