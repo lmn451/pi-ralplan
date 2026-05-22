@@ -396,19 +396,13 @@ ${prompt}`,
           new Date().toISOString();
       }
       // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      let worktreePath: string | undefined;
-      try {
-        const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-        if (worktreeResult.success && worktreeResult.path) {
-          worktreePath = worktreeResult.path;
-          console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
-        } else {
-          console.warn(
-            `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
-          );
-        }
-      } catch (error) {
-        console.warn(`[ralplan] Worktree creation error: ${error}`);
+      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
+      if (worktreeResult.success) {
+        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+      } else {
+        console.warn(
+          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+        );
       }
 
       state = buildDefaultState(
@@ -418,7 +412,9 @@ ${prompt}`,
         "brainstorm",
         sessionCwd,
       );
-      state.worktreePath = worktreePath;
+      state.worktreePath = worktreeResult.success
+        ? worktreeResult.path
+        : undefined;
       persistState();
       updateUI(ctx);
 
@@ -900,27 +896,23 @@ ${prompt}`,
       }
 
       // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      let worktreePath: string | undefined;
-      try {
-        const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-        if (worktreeResult.success && worktreeResult.path) {
-          worktreePath = worktreeResult.path;
-          console.log(`[ralplan] Worktree created: ${worktreePath}`);
-        } else {
-          console.warn(
-            `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
-          );
-          ctx.ui.notify(
-            `Worktree creation failed: ${worktreeResult.error}`,
-            "warning",
-          );
-        }
-      } catch (error) {
-        console.warn(`[ralplan] Worktree creation error: ${error}`);
+      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
+      if (worktreeResult.success) {
+        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+      } else {
+        console.warn(
+          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+        );
+        ctx.ui.notify(
+          `Worktree creation failed: ${worktreeResult.error}`,
+          "warning",
+        );
       }
 
       state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
-      state.worktreePath = worktreePath;
+      state.worktreePath = worktreeResult.success
+        ? worktreeResult.path
+        : undefined;
       persistState();
       updateUI(ctx);
 
