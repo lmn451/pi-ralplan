@@ -59,13 +59,9 @@ import {
 } from "./artifacts.js";
 
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
-import { resolveOpenQuestionsPath, resolveWorktreeRoot } from "./utils.js";
+import { resolveOpenQuestionsPath } from "./utils.js";
 
-import {
-  createWorktree,
-  detectDefaultBranch,
-  type WorktreeConfig,
-} from "./worktree.js";
+import { createWorktreeForRalplan } from "./worktree.js";
 
 import {
   createBrainstormState,
@@ -322,19 +318,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       }
 
       // Create worktree and store path in state
-      const worktreeName =
-        idea
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "")
-          .slice(0, 40) || "plan";
-      const worktreeRoot = resolveWorktreeRoot(sessionCwd);
-      const worktreeConfig: WorktreeConfig = {
-        baseBranch: detectDefaultBranch(sessionCwd),
-        worktreeRoot,
-        createBranch: true,
-      };
-      const worktreeResult = createWorktree(worktreeConfig, worktreeName);
+      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
       if (worktreeResult.success && worktreeResult.path) {
         console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
       } else {
@@ -409,19 +393,7 @@ ${prompt}`,
           new Date().toISOString();
       }
       // Create worktree and store path in state (brainstorm also uses worktrees)
-      const worktreeName =
-        idea
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "")
-          .slice(0, 40) || "plan";
-      const worktreeRoot = resolveWorktreeRoot(sessionCwd);
-      const worktreeConfig: WorktreeConfig = {
-        baseBranch: detectDefaultBranch(sessionCwd),
-        worktreeRoot,
-        createBranch: true,
-      };
-      const worktreeResult = createWorktree(worktreeConfig, worktreeName);
+      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
       if (worktreeResult.success && worktreeResult.path) {
         console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
       } else {
@@ -919,22 +891,9 @@ ${prompt}`,
       }
 
       // Create worktree for this session (same pattern as /ralplan command)
-      const worktreeName =
-        idea
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "")
-          .slice(0, 40) || "plan";
-      const worktreeRoot = resolveWorktreeRoot(sessionCwd);
-      const worktreeConfig: WorktreeConfig = {
-        baseBranch: detectDefaultBranch(sessionCwd),
-        worktreeRoot,
-        createBranch: true,
-      };
-
       let worktreePath: string | undefined;
       try {
-        const worktreeResult = createWorktree(worktreeConfig, worktreeName);
+        const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
         if (worktreeResult.success && worktreeResult.path) {
           worktreePath = worktreeResult.path;
           console.log(`[ralplan] Worktree created: ${worktreePath}`);

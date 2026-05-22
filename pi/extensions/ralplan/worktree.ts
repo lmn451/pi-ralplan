@@ -6,6 +6,7 @@ import { execFileSync } from "child_process";
 import { resolve, join } from "node:path";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname } from "node:path";
+import { resolveWorktreeRoot } from "./utils.js";
 
 // Default worktree settings
 export const DEFAULT_BASE_BRANCH = "main";
@@ -231,4 +232,37 @@ export function cleanupWorktree(path: string): WorktreeResult {
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+/**
+ * Create a worktree for RALPLAN with the given idea.
+ * This is the single entry point for all worktree creation in RALPLAN.
+ *
+ * @param directory - Session cwd
+ * @param idea - The plan idea
+ * @returns WorktreeResult with success, path, or error
+ */
+export function createWorktreeForRalplan(
+  directory: string,
+  idea: string,
+): WorktreeResult {
+  // Generate worktree name (same logic as everywhere else)
+  const worktreeName =
+    idea
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 40) || "plan";
+
+  // Get base branch and worktree root
+  const baseBranch = detectDefaultBranch(directory);
+  const worktreeRoot = resolveWorktreeRoot(directory);
+
+  const worktreeConfig: WorktreeConfig = {
+    baseBranch,
+    worktreeRoot,
+    createBranch: true,
+  };
+
+  return createWorktree(worktreeConfig, worktreeName);
 }

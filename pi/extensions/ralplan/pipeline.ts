@@ -94,7 +94,9 @@ export function registerAdapters(
   _adapters = adapters;
 }
 
-export function getAdapterById(id: string): PipelineStageAdapter | undefined {
+export function getAdapterById(
+  id: PipelineStageId,
+): PipelineStageAdapter | undefined {
   return _adapters.find((a) => a.id === id);
 }
 

@@ -22,6 +22,7 @@ import {
   generatePlanFilename,
   generateSpecFilename,
 } from "./naming.js";
+import { createWorktreeForRalplan } from "./worktree.js";
 import { resolveWorktreeRoot } from "./utils.js";
 
 export { RALPLAN_COMPLETION_SIGNAL };
@@ -30,7 +31,7 @@ export { RALPH_COMPLETION_SIGNAL };
 export { QA_COMPLETION_SIGNAL };
 
 /** Generate worktree name from idea */
-function generateWorktreeName(idea: string): string {
+export function generateWorktreeName(idea: string): string {
   // Sanitize and truncate for worktree name
   const sanitized = idea
     .toLowerCase()
@@ -40,7 +41,7 @@ function generateWorktreeName(idea: string): string {
   return sanitized || "plan";
 }
 
-function getWorktreeCreationSection(context: PipelineContext): string {
+export function getWorktreeCreationSection(context: PipelineContext): string {
   const worktreeName = generateWorktreeName(context.idea);
   const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
 
@@ -62,7 +63,7 @@ Do NOT save any files in the original repository directory.
 }
 
 /** Get date-based filename section */
-function getDateBasedNamingSection(): string {
+export function getDateBasedNamingSection(): string {
   const today = formatDate();
   return `
 ### Date-Based Naming
@@ -217,22 +218,10 @@ export const executionAdapter: PipelineStageAdapter = {
     if (context.worktreePath) return;
 
     // Create worktree when entering execution stage (lazy creation)
-    const { createWorktree, detectDefaultBranch } = require("./worktree.js");
-    const { resolveWorktreeRoot } = require("./utils.js");
-
-    const worktreeName =
-      context.idea
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "")
-        .slice(0, 40) || "plan";
-    const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
-    const worktreeConfig = {
-      baseBranch: detectDefaultBranch(context.directory || "."),
-      worktreeRoot,
-      createBranch: true,
-    };
-    const result = createWorktree(worktreeConfig, worktreeName);
+    const result = createWorktreeForRalplan(
+      context.directory || ".",
+      context.idea,
+    );
     if (result.success && result.path) {
       context.worktreePath = result.path;
       console.log(
