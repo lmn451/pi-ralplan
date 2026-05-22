@@ -163,6 +163,15 @@ export function createWorktree(
 
       // Validate created worktree
       if (!validateWorktree(worktreePath)) {
+        // Clean up orphaned worktree on validation failure
+        try {
+          execFileSync("git", ["worktree", "remove", worktreePath], {
+            stdio: "pipe",
+            timeout: 30000,
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
         return {
           success: false,
           error: "Worktree created but validation failed",
