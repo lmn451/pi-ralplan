@@ -24,7 +24,11 @@ export const PLANNING_COMPLETE = "PLANNING_COMPLETE";
  * Detect if a consensus signal (APPROVE/REJECT) is present in text.
  * Uses same boundary-aware detection as other signals.
  */
-export function detectConsensusSignal(text: string, signal: string): boolean {
+/**
+ * Detect if a signal is present in text (generic version).
+ * Searches only in non-code segments to avoid false positives.
+ */
+function detectSignalGeneric(text: string, signal: string): boolean {
   if (!signal) return false;
   const nonCodeSegments = splitByCodeBlocks(text);
   for (const segment of nonCodeSegments) {
@@ -33,6 +37,14 @@ export function detectConsensusSignal(text: string, signal: string): boolean {
     }
   }
   return false;
+}
+
+/**
+ * Detect if a completion signal is present in text for a given stage.
+ * @deprecated Use detectSignalGeneric directly with a signal string
+ */
+export function detectConsensusSignal(text: string, signal: string): boolean {
+  return detectSignalGeneric(text, signal);
 }
 
 /**
@@ -101,28 +113,12 @@ function containsBoundaryAwareSignal(text: string, signal: string): boolean {
 /** Detect if a completion signal is present in text for a given stage */
 export function detectSignal(text: string, stageId: PipelineStageId): boolean {
   const signal = STAGE_SIGNALS[stageId];
-  if (!signal) return false;
-  // Split by code blocks and search only in non-code segments
-  const nonCodeSegments = splitByCodeBlocks(text);
-  for (const segment of nonCodeSegments) {
-    if (containsBoundaryAwareSignal(segment, signal)) {
-      return true;
-    }
-  }
-  return false;
+  return detectSignalGeneric(text, signal ?? "");
 }
 
 /** Detect if a brainstorm-specific signal is present in text */
 export function detectBrainstormSignal(text: string, signal: string): boolean {
-  if (!signal) return false;
-  // Split by code blocks and search only in non-code segments
-  const nonCodeSegments = splitByCodeBlocks(text);
-  for (const segment of nonCodeSegments) {
-    if (containsBoundaryAwareSignal(segment, signal)) {
-      return true;
-    }
-  }
-  return false;
+  return detectSignalGeneric(text, signal);
 }
 
 /** Get the expected completion signal for a stage */
