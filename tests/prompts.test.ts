@@ -3,6 +3,7 @@ import {
   getExpansionPrompt,
   getDirectPlanningPrompt,
   getConsensusPlanningPrompt,
+  getRalplanDRSummaryTemplate,
 } from "../pi/extensions/ralplan/prompts.js";
 import {
   buildPipelineTracking,
@@ -46,5 +47,178 @@ describe("prompts use dynamic artifact paths", () => {
     expect(prompt).toContain(
       `Save the final approved plan to: \`${planPath}\``,
     );
+  });
+});
+
+describe("RALPLAN-DR summary template", () => {
+  it("generates RALPLAN-DR summary with required sections", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "add user authentication",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("RALPLAN-DR Summary");
+    expect(prompt).toContain("Principles");
+    expect(prompt).toContain("Decision Drivers");
+    expect(prompt).toContain("Viable Options");
+  });
+
+  it("detects DELIBERATE mode for security-related ideas", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "add JWT authentication",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("DELIBERATE");
+    expect(prompt).toContain("Pre-Mortem");
+    expect(prompt).toContain("Expanded Test Plan");
+    // "auth" keyword in "JWT authentication" triggers DELIBERATE
+    expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
+  });
+
+  it("detects DELIBERATE mode for migration ideas", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "database migration to postgres",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("DELIBERATE");
+    expect(prompt).toContain("Pre-Mortem");
+    expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
+  });
+
+  it("defaults to SHORT mode for simple ideas", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "add dark mode toggle",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("SHORT");
+    expect(prompt).not.toContain("Pre-Mortem");
+    expect(prompt).not.toContain("Expanded Test Plan");
+  });
+
+  it("requires at least 2 viable options", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "add caching layer",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("≥2");
+    expect(prompt).toContain("Option A");
+    expect(prompt).toContain("Option B");
+    expect(prompt).toContain("Pros");
+    expect(prompt).toContain("Cons");
+  });
+});
+
+describe("RALPLAN consensus prompt — new behavior", () => {
+  it("includes BE BRIEF directive", () => {
+    const prompt = getConsensusPlanningPrompt({
+      idea: "add feature",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("BE BRIEF");
+    expect(prompt).toContain("Concise reasoning");
+  });
+
+  it("includes SEQUENTIAL requirement for Architect then Critic", () => {
+    const prompt = getConsensusPlanningPrompt({
+      idea: "add feature",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("SEQUENTIAL");
+    expect(prompt).toContain("Do NOT run Architect and Critic in parallel");
+    expect(prompt).toContain("await before Critic");
+  });
+
+  it("includes REVISION NEEDED as architect verdict option", () => {
+    const prompt = getConsensusPlanningPrompt({
+      idea: "add feature",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("REVISION NEEDED");
+  });
+
+  it("includes full ADR format on completion", () => {
+    const prompt = getConsensusPlanningPrompt({
+      idea: "add feature",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("### Decision");
+    expect(prompt).toContain("### Drivers");
+    expect(prompt).toContain("### Alternatives Considered");
+    expect(prompt).toContain("### Why Chosen");
+    expect(prompt).toContain("### Consequences");
+    expect(prompt).toContain("### Follow-ups");
+  });
+
+  it("mentions save to drafts path for plan draft", () => {
+    const prompt = getConsensusPlanningPrompt({
+      idea: "add feature",
+      directory: "/tmp/worktree",
+      specPath: "plans/spec.md",
+      planPath: "plans/plan.md",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("plans/drafts/plan_draft.md");
+  });
+
+  it("includes iteration loop with max 5", () => {
+    const prompt = getConsensusPlanningPrompt({
+      idea: "add feature",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(prompt).toContain("max 5");
+    expect(prompt).toContain("non-APPROVE");
+  });
+
+  it("includes deliberate mode reject criteria for Critic", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "add security audit",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    // The DELIBERATE signal is present when security keyword detected
+    expect(prompt).toContain("DELIBERATE");
+
+    const consensusPrompt = getConsensusPlanningPrompt({
+      idea: "add security audit",
+      directory: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+
+    expect(consensusPrompt).toContain("Reject missing pre-mortem");
+    expect(consensusPrompt).toContain("DELIBERATE mode");
   });
 });
