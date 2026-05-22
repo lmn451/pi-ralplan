@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  CONSENSUS_APPROVED,
+  CONSENSUS_REJECTED,
+  detectConsensusSignal,
   detectSignal,
   getExpectedSignal,
   getLastAssistantText,
@@ -134,5 +137,58 @@ describe("getLastAssistantText", () => {
 
   it("returns null for empty messages", () => {
     expect(getLastAssistantText([])).toBeNull();
+  });
+});
+
+describe("detectConsensusSignal", () => {
+  it("detects CONSENSUS_APPROVED on its own line", () => {
+    expect(
+      detectConsensusSignal("CONSENSUS_APPROVED", CONSENSUS_APPROVED),
+    ).toBe(true);
+    expect(
+      detectConsensusSignal("Done!\nCONSENSUS_APPROVED\n", CONSENSUS_APPROVED),
+    ).toBe(true);
+  });
+
+  it("detects CONSENSUS_REJECTED on its own line", () => {
+    expect(
+      detectConsensusSignal("CONSENSUS_REJECTED", CONSENSUS_REJECTED),
+    ).toBe(true);
+    expect(
+      detectConsensusSignal(
+        "Issues found.\nCONSENSUS_REJECTED\n",
+        CONSENSUS_REJECTED,
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects both signals in code blocks", () => {
+    expect(
+      detectConsensusSignal("```\nCONSENSUS_APPROVED\n```", CONSENSUS_APPROVED),
+    ).toBe(false);
+    expect(
+      detectConsensusSignal(
+        "```js\nCONSENSUS_REJECTED;\n```",
+        CONSENSUS_REJECTED,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects both signals in single-line comments", () => {
+    expect(
+      detectConsensusSignal("// CONSENSUS_APPROVED", CONSENSUS_APPROVED),
+    ).toBe(false);
+    expect(
+      detectConsensusSignal("# CONSENSUS_REJECTED", CONSENSUS_REJECTED),
+    ).toBe(false);
+  });
+
+  it("rejects both signals in inline code", () => {
+    expect(
+      detectConsensusSignal("`CONSENSUS_APPROVED`", CONSENSUS_APPROVED),
+    ).toBe(false);
+    expect(
+      detectConsensusSignal("`CONSENSUS_REJECTED`", CONSENSUS_REJECTED),
+    ).toBe(false);
   });
 });

@@ -58,6 +58,18 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
       parsed.version = 3;
       // worktreePath will be undefined — correct for v2
     }
+    // Validate critical fields
+    if (
+      typeof parsed.active !== "boolean" ||
+      typeof parsed.pipeline !== "object" ||
+      !Array.isArray(parsed.pipeline?.stages) ||
+      (parsed.sessionId != null && typeof parsed.sessionId !== "string") ||
+      typeof parsed.mode !== "string"
+    ) {
+      console.warn("[ralplan] State file has invalid shape, treating as empty");
+      return null;
+    }
+
     return parsed as unknown as RalplanState;
   } catch {
     return null;
