@@ -39,7 +39,7 @@ Each step represents an independent evaluation by a separately invoked agent.
 2. **State 2 (Architect)**: Reviews `plans/drafts/plan_draft.md` for technical feasibility.
    Must provide the strongest steelman antithesis.
    - _If REVISION NEEDED_: Route back to State 1 (Planner) with feedback.
-   - _If APPROVED_: Proceed to State 3.
+   - _If APPROVE_: Proceed to State 3.
    - **SEQUENTIAL requirement:** Await Architect's complete verdict before invoking Critic.
 3. **State 3 (Critic)**: Reviews the Architect-approved draft. Challenges assumptions,
    identifies edge cases, verifies security/ops.
@@ -60,18 +60,21 @@ Each step represents an independent evaluation by a separately invoked agent.
 ### 1. The Specification (`plans/spec.md`)
 
 The foundational requirements document. MUST include:
+
 - `## Acceptance Criteria` (Testable boolean statements)
 - `## Requirement Coverage Map`
 
 ### 2. The Plan Draft (`plans/drafts/plan_draft.md`)
 
 The working plan during consensus review. MUST include:
+
 - Implementation plan (task breakdown, dependency graph, acceptance criteria, risk register)
 - **RALPLAN-DR Summary** (see below) — placed before Architect review
 
 ### 3. The Final Plan (`plans/plan.md`)
 
 The consensus-approved implementation guide. MUST include:
+
 - `## Architecture Decision Record (ADR)`:
   - **Decision:** One-sentence decision statement
   - **Drivers:** Top 3 decision drivers with rationale
@@ -96,30 +99,36 @@ The Planner MUST generate this summary block BEFORE Architect review:
 **Mode:** SHORT (default) | DELIBERATE (high-risk signals detected)
 
 ### Principles (3–5)
+
 - [P1] Principle statement
 - [P2] Principle statement
 
 ### Top 3 Decision Drivers
+
 1. [Driver name] — [why this drives the decision]
 2. [Driver name] — [why this drives the decision]
 3. [Driver name] — [why this drives the decision]
 
 ### Viable Options (≥2 required)
+
 **Option A:** [name]
+
 - Pros: ...
 - Cons: ...
-**Option B:** [name]
+  **Option B:** [name]
 - Pros: ...
 - Cons: ...
 
-*(If only 1 option survives: explicit invalidation rationale for rejected alternatives)*
+_(If only 1 option survives: explicit invalidation rationale for rejected alternatives)_
 
 ### Pre-Mortem (DELIBERATE mode only — 3 failure scenarios)
+
 - **Scenario 1:** [How it fails] → Mitigation: [...]
 - **Scenario 2:** [How it fails] → Mitigation: [...]
 - **Scenario 3:** [How it fails] → Mitigation: [...]
 
 ### Expanded Test Plan (DELIBERATE mode only)
+
 - Unit tests: [...]
 - Integration tests: [...]
 - E2E tests: [...]
@@ -129,6 +138,7 @@ The Planner MUST generate this summary block BEFORE Architect review:
 ### DELIBERATE Mode Triggers
 
 Auto-triggered by high-risk signals in the idea:
+
 - `auth`, `security`, `credential`, `secret`, `password`, `token`
 - `migration`, `schema`, `database`, `production`
 - `destroy`, `delete`, `rm`, `remove everything`
@@ -144,14 +154,17 @@ RALPLAN specifies what each agent receives and produces. The host environment
 decides how to invoke agents (subagent, Task(), direct API, etc.).
 
 ### Planner
+
 - **Receives:** Original idea, spec path, previous feedback (if any), role prompt
 - **Produces:** `plans/drafts/plan_draft.md` with RALPLAN-DR Summary
 
 ### Architect
+
 - **Receives:** `plans/drafts/plan_draft.md`, role prompt
-- **Produces:** `plans/drafts/architect_review.md` with verdict (`APPROVED` | `REVISION NEEDED`)
+- **Produces:** `plans/drafts/architect_review.md` with verdict (`APPROVE` | `REVISION NEEDED`)
 
 ### Critic
+
 - **Receives:** `plans/drafts/plan_draft.md`, `plans/drafts/architect_review.md`, role prompt
 - **Produces:** `plans/drafts/critic_review.md` with verdict (`APPROVE` | `ITERATE` | `REJECT`)
 

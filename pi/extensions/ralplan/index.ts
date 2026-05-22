@@ -61,7 +61,7 @@ import {
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 import { resolveOpenQuestionsPath } from "./utils.js";
 
-import { createWorktreeForRalplan } from "./worktree.js";
+import { createWorktreeForRalplan, cleanupWorktree } from "./worktree.js";
 
 import {
   createBrainstormState,
@@ -181,7 +181,6 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       // Best-effort worktree cleanup — warn but don't block deactivation
       if (state.worktreePath) {
         try {
-          const { cleanupWorktree } = require("./worktree.js");
           const result = cleanupWorktree(state.worktreePath);
           if (!result.success) {
             console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
@@ -397,13 +396,19 @@ ${prompt}`,
           new Date().toISOString();
       }
       // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-      if (worktreeResult.success && worktreeResult.path) {
-        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
-      } else {
-        console.warn(
-          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
-        );
+      let worktreePath: string | undefined;
+      try {
+        const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
+        if (worktreeResult.success && worktreeResult.path) {
+          worktreePath = worktreeResult.path;
+          console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+        } else {
+          console.warn(
+            `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+          );
+        }
+      } catch (error) {
+        console.warn(`[ralplan] Worktree creation error: ${error}`);
       }
 
       state = buildDefaultState(
@@ -413,9 +418,7 @@ ${prompt}`,
         "brainstorm",
         sessionCwd,
       );
-      state.worktreePath = worktreeResult.success
-        ? worktreeResult.path
-        : undefined;
+      state.worktreePath = worktreePath;
       persistState();
       updateUI(ctx);
 

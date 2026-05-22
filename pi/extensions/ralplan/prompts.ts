@@ -320,7 +320,7 @@ Verify:
 3. All acceptance criteria from the plan are met
 4. No missing features or incomplete implementations
 
-Verdict: APPROVED (all requirements met) or REJECTED (with specific gaps)"
+Verdict: APPROVE (all requirements met) or REJECTED (with specific gaps)"
 )
 
 // Security Review
@@ -336,7 +336,7 @@ Check the implementation for:
 5. Injection vulnerabilities (SQL, command, XSS)
 6. Hardcoded secrets or credentials
 
-Verdict: APPROVED (no vulnerabilities) or REJECTED (with specific issues)"
+Verdict: APPROVE (no vulnerabilities) or REJECTED (with specific issues)"
 )
 
 // Code Quality Review
@@ -351,7 +351,7 @@ Review the implementation for:
 4. Test coverage adequacy
 5. Maintainability and readability
 
-Verdict: APPROVED (high quality) or REJECTED (with specific issues)"
+Verdict: APPROVE (high quality) or REJECTED (with specific issues)"
 )
 \`\`\`
 
@@ -372,14 +372,28 @@ Signal: ${RALPH_COMPLETION_SIGNAL}`;
 /** RALPLAN-DR summary format for the Planner to generate */
 export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
   const deliberateSignals = [
-    "auth", "security", "credential", "secret", "password", "token",
-    "migration", "schema", "database", "production",
-    "destroy", "delete", "rm",
-    "compliance", "PII", "GDPR", "HIPAA",
-    "public API", "breaking change",
+    "auth",
+    "security",
+    "credential",
+    "secret",
+    "password",
+    "token",
+    "migration",
+    "schema",
+    "database",
+    "production",
+    "destroy",
+    "delete",
+    "rm",
+    "compliance",
+    "PII",
+    "GDPR",
+    "HIPAA",
+    "public API",
+    "breaking change",
   ];
   const idea = context.idea.toLowerCase();
-  const isDeliberate = deliberateSignals.some(s => idea.includes(s));
+  const isDeliberate = deliberateSignals.some((s) => idea.includes(s));
 
   return `
 ### RALPLAN-DR Summary (REQUIRED — generate before Architect review)
@@ -406,7 +420,9 @@ export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
 
 *(If only 1 option: explicit invalidation of alternatives)*
 
-${isDeliberate ? `### Pre-Mortem (3 failure scenarios)
+${
+  isDeliberate
+    ? `### Pre-Mortem (3 failure scenarios)
 - **Scenario 1:** [How it fails] → Mitigation: [...]
 - **Scenario 2:** [How it fails] → Mitigation: [...]
 - **Scenario 3:** [How it fails] → Mitigation: [...]
@@ -415,7 +431,9 @@ ${isDeliberate ? `### Pre-Mortem (3 failure scenarios)
 - Unit tests: [...]
 - Integration tests: [...]
 - E2E tests: [...]
-- Observability: [...]` : ''}
+- Observability: [...]`
+    : ""
+}
 `;
 }
 
@@ -458,7 +476,7 @@ Use the \`/skill:ralplan\` skill for detailed consensus workflow instructions.
 
 Do NOT run Architect and Critic in parallel. Wait for Architect's full verdict before spawning Critic.
 
-Architect verdict: \`APPROVED\` | \`REVISION NEEDED\`
+Architect verdict: \`APPROVE\` | \`REVISION NEEDED\`
 
 ### Critic Review
 

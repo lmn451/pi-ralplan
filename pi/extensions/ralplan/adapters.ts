@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type {
   PipelineStageAdapter,
   PipelineConfig,
@@ -44,6 +45,7 @@ export function generateWorktreeName(idea: string): string {
 export function getWorktreeCreationSection(context: PipelineContext): string {
   const worktreeName = generateWorktreeName(context.idea);
   const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
+  const worktreePath = join(worktreeRoot, worktreeName);
 
   return `
 ### Worktree Creation
@@ -51,12 +53,12 @@ export function getWorktreeCreationSection(context: PipelineContext): string {
 Before planning begins, a new Git worktree will be created for this plan.
 
 - **Worktree Name:** \`${worktreeName}\`
-- **Worktree Path:** \`${worktreeRoot}/${worktreeName}\`
+- **Worktree Path:** \`${worktreePath}\`
 - **Base Branch:** main (configurable)
 
 The worktree isolates this plan's work from the main repository.
 
-**YOUR WORKING DIRECTORY:** \`${worktreeRoot}/${worktreeName}\`
+**YOUR WORKING DIRECTORY:** \`${worktreePath}\`
 All planning artifacts (spec, plan, open-questions, answers) MUST be saved relative to this directory.
 Do NOT save any files in the original repository directory.
 `;

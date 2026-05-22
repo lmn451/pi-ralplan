@@ -15,8 +15,13 @@ export const BRAINSTORM_OPEN_QUESTIONS_READY =
 export const CONSENSUS_APPROVED = "CONSENSUS_APPROVED";
 export const CONSENSUS_REJECTED = "CONSENSUS_REJECTED";
 
+/** Planning expansion signals */
+export const EXPANSION_COMPLETE = "EXPANSION_COMPLETE";
+export const PLAN_CREATED = "PLAN_CREATED";
+export const PLANNING_COMPLETE = "PLANNING_COMPLETE";
+
 /**
- * Detect if a consensus signal (APPROVED/REJECTED) is present in text.
+ * Detect if a consensus signal (APPROVE/REJECT) is present in text.
  * Uses same boundary-aware detection as other signals.
  */
 export function detectConsensusSignal(text: string, signal: string): boolean {
