@@ -71,7 +71,13 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
     }
 
     return parsed as unknown as RalplanState;
-  } catch {
+  } catch (error) {
+    // State file read failed - could be corruption, permissions, etc.
+    // Return null to treat as no state
+    console.warn(
+      "[ralplan] Failed to read state file:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
