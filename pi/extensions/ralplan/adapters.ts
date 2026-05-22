@@ -212,6 +212,37 @@ export const executionAdapter: PipelineStageAdapter = {
     return false;
   },
 
+  onEnter(context: PipelineContext): void {
+    // Only create worktree if not already created (e.g., via /ralplan command)
+    if (context.worktreePath) return;
+
+    // Create worktree when entering execution stage (lazy creation)
+    const { createWorktree, detectDefaultBranch } = require("./worktree.js");
+    const { resolveWorktreeRoot } = require("./utils.js");
+
+    const worktreeName =
+      context.idea
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 40) || "plan";
+    const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
+    const worktreeConfig = {
+      baseBranch: detectDefaultBranch(context.directory || "."),
+      worktreeRoot,
+      createBranch: true,
+    };
+    const result = createWorktree(worktreeConfig, worktreeName);
+    if (result.success && result.path) {
+      context.worktreePath = result.path;
+      console.log(
+        `[ralplan] Worktree created at execution entry: ${result.path}`,
+      );
+    } else {
+      console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
+    }
+  },
+
   getPrompt(context: PipelineContext): string {
     const planPath = context.planPath || "plans/plan.md";
     const cwdNote =

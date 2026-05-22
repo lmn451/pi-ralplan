@@ -4,7 +4,8 @@
 
 import { execFileSync } from "child_process";
 import { resolve, join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { dirname } from "node:path";
 
 // Default worktree settings
 export const DEFAULT_BASE_BRANCH = "main";
@@ -72,10 +73,37 @@ function sanitizeWorktreeName(name: string): string {
 export function validateWorktree(path: string): boolean {
   try {
     const gitDir = join(path, ".git");
-    return existsSync(gitDir);
+    try {
+      const stats = statSync(gitDir);
+      if (stats.isDirectory()) {
+        return true;
+      }
+      // It's a file - read and check for gitdir: reference
+      const content = readFileSync(gitDir, "utf-8");
+      const match = content.match(/^gitdir:\s*(.+)$/m);
+      if (match) {
+        const gitdirPath = match[1].trim();
+        // Resolve relative paths from the .git file's directory
+        const resolvedGitdir = resolve(dirname(gitDir), gitdirPath);
+        return existsSync(resolvedGitdir);
+      }
+    } catch {
+      // statSync or readFileSync failed - not a valid worktree
+    }
+    return false;
   } catch {
     return false;
   }
+}
+
+function generateUniqueWorktreePath(basePath: string): string {
+  let path = basePath;
+  let suffix = 2;
+  while (existsSync(path)) {
+    path = `${basePath}-${suffix}`;
+    suffix++;
+  }
+  return path;
 }
 
 export function createWorktree(
@@ -90,9 +118,13 @@ export function createWorktree(
       // Ensure worktree root exists
       mkdirSync(config.worktreeRoot, { recursive: true });
 
-      // Sanitize and resolve path
+      // Sanitize and resolve path with unique suffix for collision handling
       const sanitizedName = sanitizeWorktreeName(name);
-      const worktreePath = resolve(config.worktreeRoot, sanitizedName);
+      const baseWorktreePath = resolve(config.worktreeRoot, sanitizedName);
+      // Generate unique path if collision exists
+      let worktreePath = generateUniqueWorktreePath(baseWorktreePath);
+      const uniqueSuffix =
+        worktreePath !== baseWorktreePath ? `-${Date.now().toString(36)}` : "";
 
       // Check if worktree already exists
       if (existsSync(worktreePath)) {
@@ -110,17 +142,19 @@ export function createWorktree(
 
       // Build safe git commands using argument arrays (no shell interpolation)
       if (config.createBranch) {
-        const branchName = `feature/${sanitizedName}`;
+        const branchName = `feature/${sanitizedName}${uniqueSuffix}`;
         execFileSync(
           "git",
           ["worktree", "add", "-b", branchName, worktreePath, baseBranch],
           {
             stdio: "pipe",
+            timeout: 30000,
           },
         );
       } else {
         execFileSync("git", ["worktree", "add", worktreePath, baseBranch], {
           stdio: "pipe",
+          timeout: 30000,
         });
       }
 
@@ -153,18 +187,30 @@ export function createWorktree(
   };
 }
 
+function parseWorktreeEntry(entry: string): string {
+  const pathMatch = entry.match(/^worktree\s+(.+)$/m);
+  if (!pathMatch) return "";
+  let worktreePath = pathMatch[1].trim();
+  // Check if there's a gitdir reference pointing to a different location
+  const gitdirMatch = entry.match(/^gitdir\s+(.+)$/m);
+  if (gitdirMatch) {
+    const gitdirPath = gitdirMatch[1].trim();
+    // If gitdir is relative, resolve it relative to the worktree path
+    if (!resolve(gitdirPath).startsWith(resolve(worktreePath))) {
+      // The gitdir is in a different location, resolve it
+      worktreePath = resolve(worktreePath, gitdirPath);
+    }
+  }
+  return worktreePath;
+}
+
 export function listWorktrees(): string[] {
   try {
     const output = execFileSync("git", ["worktree", "list", "--porcelain"], {
       encoding: "utf-8",
+      timeout: 30000,
     });
-    return output
-      .split("\n\n")
-      .map((entry) => {
-        const pathMatch = entry.match(/^worktree\s+(.+)$/m);
-        return pathMatch ? pathMatch[1].trim() : "";
-      })
-      .filter(Boolean);
+    return output.split("\n\n").map(parseWorktreeEntry).filter(Boolean);
   } catch {
     return [];
   }
@@ -174,6 +220,7 @@ export function cleanupWorktree(path: string): WorktreeResult {
   try {
     execFileSync("git", ["worktree", "remove", path], {
       stdio: "pipe",
+      timeout: 30000,
     });
     return { success: true };
   } catch (error) {
