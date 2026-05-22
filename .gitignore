@@ -1,5 +1,3 @@
-# Pi runtime state, generated plans, and drafts
+# Pi runtime state and generated content
 .pi/
-!.pi/settings.json
-plan/plans/
-plan/drafts/
+plans/

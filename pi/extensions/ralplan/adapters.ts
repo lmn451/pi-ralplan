@@ -134,11 +134,7 @@ export const ralplanAdapter: PipelineStageAdapter = {
     return config.planning === false;
   },
 
-  // Note: worktree creation is handled in index.ts command handlers
-  // to properly store the path in state
-  onEnter(_context: PipelineContext): void {
-    // Worktree is created in /ralplan or /brainstorm command handlers
-  },
+  // onEnter: worktree is created by command handlers, see executionAdapter.onEnter
 
   getPrompt(context: PipelineContext): string {
     // Brainstorm mode dispatch
@@ -214,10 +210,24 @@ export const executionAdapter: PipelineStageAdapter = {
   },
 
   onEnter(context: PipelineContext): void {
-    // Only create worktree if not already created (e.g., via /ralplan command)
+    // WORKTREE CREATION DESIGN (two-entry-point pattern):
+    //
+    // Worktree can be created in TWO places:
+    // 1. Command handlers in index.ts (/ralplan, /brainstorm, --ralplan, --brainstorm)
+    //    - These set state.worktreePath early so the path is available immediately
+    // 2. executionAdapter.onEnter() as a FALLBACK for pipelines that skip planning
+    //
+    // The guard below prevents double-creation when path was set by (1):
+    //   if (context.worktreePath) return;  // worktree already exists, skip
+    //
+    // Why this pattern?
+    // - /ralplan command: creates worktree immediately for user feedback
+    // - --ralplan flag (auto-start): same, but via before_agent_start handler
+    // - Pipelines skipping planning (planning=false): no command handler runs,
+    //   so onEnter lazily creates the worktree on first execution stage entry
     if (context.worktreePath) return;
 
-    // Create worktree when entering execution stage (lazy creation)
+    // Lazy creation for pipelines that skip planning stage
     const result = createWorktreeForRalplan(
       context.directory || ".",
       context.idea,

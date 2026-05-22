@@ -11,6 +11,7 @@ import {
   getPipelineStatus,
   formatPipelineHUD,
   getAdapterById,
+  getActiveAdapters,
   registerAdapters,
   syncTrackingToConfig,
   DEFAULT_PIPELINE_CONFIG,
@@ -18,6 +19,7 @@ import {
   type PipelineTracking,
   type PipelineContext,
   type PipelineStageAdapter,
+  type PipelineStageId,
 } from "../pi/extensions/ralplan/pipeline.js";
 
 import {
@@ -339,5 +341,89 @@ describe("formatPipelineHUD", () => {
     expect(hud[1]).toContain("Execution");
     expect(hud[2]).toContain("--");
     expect(hud[3]).toContain("--");
+  });
+});
+
+describe("getAdapterById", () => {
+  it("returns adapter for valid PipelineStageId", () => {
+    const adapter = getAdapterById("ralplan");
+    expect(adapter).toBeDefined();
+    expect(adapter!.id).toBe("ralplan");
+  });
+
+  it("returns adapter for all valid stage ids", () => {
+    const ids: PipelineStageId[] = ["ralplan", "execution", "ralph", "qa"];
+    for (const id of ids) {
+      const adapter = getAdapterById(id);
+      expect(adapter).toBeDefined();
+      expect(adapter!.id).toBe(id);
+    }
+  });
+
+  it("returns undefined for unknown id", () => {
+    const adapter = getAdapterById("nonexistent" as PipelineStageId);
+    expect(adapter).toBeUndefined();
+  });
+
+  it("returns undefined after adapters are cleared", () => {
+    registerAdapters([]);
+    const adapter = getAdapterById("execution");
+    expect(adapter).toBeUndefined();
+  });
+
+  it("accepts string literal matching PipelineStageId", () => {
+    const stageId: PipelineStageId = "ralph";
+    const adapter = getAdapterById(stageId);
+    expect(adapter).toBeDefined();
+    expect(adapter!.id).toBe("ralph");
+  });
+});
+
+describe("getActiveAdapters", () => {
+  it("returns all adapters when no stages are disabled", () => {
+    const config = resolvePipelineConfig({
+      planning: "ralplan",
+      execution: "solo",
+      verification: { engine: "ralph", maxIterations: 100 },
+      qa: true,
+    });
+    const adapters = getActiveAdapters(config);
+    expect(adapters).toHaveLength(4);
+  });
+
+  it("excludes planning adapter when planning is disabled", () => {
+    const config = resolvePipelineConfig({ planning: false });
+    const adapters = getActiveAdapters(config);
+    expect(adapters.map((a) => a.id)).not.toContain("ralplan");
+  });
+
+  it("excludes qa adapter when qa is disabled", () => {
+    const config = resolvePipelineConfig({ qa: false });
+    const adapters = getActiveAdapters(config);
+    expect(adapters.map((a) => a.id)).not.toContain("qa");
+  });
+
+  it("excludes verification adapter when verification is disabled", () => {
+    const config = resolvePipelineConfig({ verification: false });
+    const adapters = getActiveAdapters(config);
+    expect(adapters.map((a) => a.id)).not.toContain("ralph");
+  });
+});
+
+describe("syncTrackingToConfig", () => {
+  it("skips stages based on config changes", () => {
+    const tracking = buildPipelineTracking(resolvePipelineConfig());
+    tracking.pipelineConfig.qa = false;
+    syncTrackingToConfig(tracking);
+    const qaStage = tracking.stages.find((s) => s.id === "qa");
+    expect(qaStage?.status).toBe("skipped");
+  });
+
+  it("does not affect already completed stages", () => {
+    const tracking = buildPipelineTracking(resolvePipelineConfig());
+    tracking.stages[0].status = "complete";
+    tracking.pipelineConfig.planning = false;
+    syncTrackingToConfig(tracking);
+    expect(tracking.stages[0].status).toBe("complete");
   });
 });

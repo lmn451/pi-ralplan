@@ -8,7 +8,10 @@ import {
   clearRalplanStateFile,
   buildDefaultState,
 } from "../pi/extensions/ralplan/state.js";
-import { buildPipelineTracking, DEFAULT_PIPELINE_CONFIG } from "../pi/extensions/ralplan/pipeline.js";
+import {
+  buildPipelineTracking,
+  DEFAULT_PIPELINE_CONFIG,
+} from "../pi/extensions/ralplan/pipeline.js";
 import { getDefaultArtifactFilename } from "../pi/extensions/ralplan/artifacts.js";
 
 let tempDir: string;
@@ -89,7 +92,13 @@ describe("buildDefaultState", () => {
 
   it("builds state with brainstorm mode", () => {
     const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
-    const state = buildDefaultState("idea", pipeline, undefined, "brainstorm", tempDir);
+    const state = buildDefaultState(
+      "idea",
+      pipeline,
+      undefined,
+      "brainstorm",
+      tempDir,
+    );
     expect(state.version).toBe(3);
     expect(state.mode).toBe("brainstorm");
     expect(state.brainstorm).toBeDefined();
@@ -109,11 +118,300 @@ describe("buildDefaultState", () => {
       startedAt: new Date().toISOString(),
     };
     mkdirSync(join(tempDir, ".pi", "ralplan"), { recursive: true });
-    writeFileSync(join(tempDir, ".pi", "ralplan", "state.json"), JSON.stringify(v1State, null, 2), "utf-8");
+    writeFileSync(
+      join(tempDir, ".pi", "ralplan", "state.json"),
+      JSON.stringify(v1State, null, 2),
+      "utf-8",
+    );
     const read = readRalplanStateFile(tempDir);
     expect(read).not.toBeNull();
     expect(read!.version).toBe(3);
     expect(read!.mode).toBe("ralplan");
     expect(read!.brainstorm).toBeUndefined();
+  });
+});
+
+describe("readRalplanStateFile validation", () => {
+  const writeState = (state: object) => {
+    mkdirSync(join(tempDir, ".pi", "ralplan"), { recursive: true });
+    writeFileSync(
+      join(tempDir, ".pi", "ralplan", "state.json"),
+      JSON.stringify(state, null, 2),
+      "utf-8",
+    );
+  };
+
+  describe("malformed state", () => {
+    it("returns null when active field is missing", () => {
+      const state = {
+        version: 3,
+        // active missing
+        pipeline: { stages: [] },
+        mode: "ralplan",
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when active is not a boolean", () => {
+      const state = {
+        version: 3,
+        active: "true", // string, not boolean
+        pipeline: { stages: [] },
+        mode: "ralplan",
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when pipeline is missing", () => {
+      const state = {
+        version: 3,
+        active: true,
+        mode: "ralplan",
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when pipeline.stages is missing", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: {
+          /* stages missing */
+        },
+        mode: "ralplan",
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when pipeline.stages is not an array", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: { stages: "not-an-array" },
+        mode: "ralplan",
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when mode is missing", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: { stages: [] },
+        // mode missing
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when mode is not a string", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: { stages: [] },
+        mode: 123, // number, not string
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when sessionId is present but not a string", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: { stages: [] },
+        mode: "ralplan",
+        sessionId: 12345, // number, not string
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("returns null when sessionId is an object instead of string", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: { stages: [] },
+        mode: "ralplan",
+        sessionId: { id: "123" }, // object, not string
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+
+    it("allows null sessionId", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: { stages: [] },
+        mode: "ralplan",
+        sessionId: null,
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).not.toBeNull();
+    });
+
+    it("allows undefined sessionId", () => {
+      const state = {
+        version: 3,
+        active: true,
+        pipeline: { stages: [] },
+        mode: "ralplan",
+        // sessionId not present
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).not.toBeNull();
+    });
+
+    it("returns null for future version", () => {
+      const state = {
+        version: 99,
+        active: true,
+        pipeline: { stages: [] },
+        mode: "ralplan",
+        originalIdea: "test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(state);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
+  });
+
+  describe("version migration", () => {
+    it("migrates v1 state through v2 to v3", () => {
+      const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
+      const v1State = {
+        version: 1,
+        active: true,
+        pipeline: pipeline,
+        originalIdea: "v1 migration test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(v1State);
+      const read = readRalplanStateFile(tempDir);
+      expect(read).not.toBeNull();
+      expect(read!.version).toBe(3);
+      expect(read!.mode).toBe("ralplan");
+      expect(read!.brainstorm).toBeUndefined();
+      expect(read!.worktreePath).toBeUndefined();
+    });
+
+    it("migrates v2 state to v3", () => {
+      const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
+      const v2State = {
+        version: 2,
+        active: false,
+        mode: "brainstorm",
+        pipeline: pipeline,
+        originalIdea: "v2 migration test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(v2State);
+      const read = readRalplanStateFile(tempDir);
+      expect(read).not.toBeNull();
+      expect(read!.version).toBe(3);
+      expect(read!.mode).toBe("brainstorm");
+      expect(read!.worktreePath).toBeUndefined();
+    });
+
+    it("preserves brainstorm state during v1 to v3 migration", () => {
+      const pipeline = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
+      const v1BrainstormState = {
+        version: 1,
+        active: true,
+        mode: "brainstorm",
+        brainstorm: {
+          subPhase: "expanding",
+          answeredQuestions: [],
+        },
+        answersPath: "answers.md",
+        pipeline: pipeline,
+        originalIdea: "v1 brainstorm test",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(v1BrainstormState);
+      const read = readRalplanStateFile(tempDir);
+      expect(read).not.toBeNull();
+      expect(read!.version).toBe(3);
+      // Note: v1→v2 migration unconditionally sets mode to "ralplan"
+      // so brainstorm mode is not preserved through migration
+      expect(read!.mode).toBe("ralplan");
+      // but brainstorm object is preserved
+      expect(read!.brainstorm).toBeDefined();
+      expect(read!.brainstorm!.subPhase).toBe("expanding");
+    });
+
+    it("returns null when v1 state is missing required fields after migration", () => {
+      // v1 state missing mode field, after migration to v2 the validation would still fail
+      // because the v2 migration adds mode if missing, but v1 without active would fail
+      const v1IncompleteState = {
+        version: 1,
+        // active missing
+        pipeline: { stages: [] },
+        originalIdea: "v1 incomplete",
+        specPath: "plans/spec.md",
+        planPath: "plans/plan.md",
+        startedAt: new Date().toISOString(),
+      };
+      writeState(v1IncompleteState);
+      expect(readRalplanStateFile(tempDir)).toBeNull();
+    });
   });
 });

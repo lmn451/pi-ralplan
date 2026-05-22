@@ -135,6 +135,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     return join(state.worktreePath, path);
   }
 
+  // NOTE: worktreePath is included so executionAdapter.onEnter() can detect
+  // if a worktree was already created. The guard "if (context.worktreePath) return;"
+  // in onEnter prevents redundant creation.
   function buildContext(): PipelineContext | null {
     if (!state) return null;
     return {
@@ -151,6 +154,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       config: state.pipeline.pipelineConfig,
       mode: state.mode,
       brainstorm: state.brainstorm,
+      worktreePath: state.worktreePath,
     };
   }
 
@@ -317,7 +321,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
           new Date().toISOString();
       }
 
-      // Create worktree and store path in state
+      // Create worktree (guards against double-creation in executionAdapter.onEnter)
       const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
       if (worktreeResult.success && worktreeResult.path) {
         console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
@@ -392,7 +396,7 @@ ${prompt}`,
         tracking.stages[tracking.currentStageIndex].startedAt =
           new Date().toISOString();
       }
-      // Create worktree and store path in state (brainstorm also uses worktrees)
+      // Create worktree (guards against double-creation in executionAdapter.onEnter)
       const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
       if (worktreeResult.success && worktreeResult.path) {
         console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
@@ -890,7 +894,7 @@ ${prompt}`,
           new Date().toISOString();
       }
 
-      // Create worktree for this session (same pattern as /ralplan command)
+      // Create worktree (guards against double-creation in executionAdapter.onEnter)
       let worktreePath: string | undefined;
       try {
         const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
