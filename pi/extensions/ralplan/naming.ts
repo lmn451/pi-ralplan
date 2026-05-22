@@ -14,7 +14,7 @@ export function formatDate(date: Date = new Date()): string {
 export function sanitizeDescription(desc: string): string {
   return desc
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 50);
 }
