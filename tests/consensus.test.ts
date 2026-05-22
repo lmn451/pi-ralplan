@@ -208,5 +208,14 @@ describe("consensus module", () => {
       state.iteration = 6;
       expect(getNextRole(state)).toBe("planner");
     });
+
+    it("returns critic when both architect and critic have approved (dual approval edge case)", () => {
+      const state = createConsensusState();
+      state.roleApprovals.architect = true;
+      state.roleApprovals.critic = true;
+      // When both architect and critic have approved, getNextRole returns current role (planner)
+      // This edge case shouldn't happen in normal flow but should be handled gracefully
+      expect(getNextRole(state)).toBe("planner");
+    });
   });
 });

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { existsSync, mkdirSync } from "node:fs";
 
 // Mock child_process before importing worktree
 vi.mock("child_process", () => ({
@@ -10,9 +9,11 @@ vi.mock("child_process", () => ({
 import { execFileSync } from "child_process";
 import {
   createWorktree,
+  createWorktreeForRalplan,
   listWorktrees,
   cleanupWorktree,
   validateWorktree,
+  detectDefaultBranch,
 } from "../pi/extensions/ralplan/worktree.js";
 
 describe("worktree.ts", () => {
@@ -65,6 +66,74 @@ describe("worktree.ts", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("directory traversal");
+    });
+  });
+
+  describe("createWorktreeForRalplan()", () => {
+    it("should call detectDefaultBranch and then createWorktree", () => {
+      // detectDefaultBranch calls execFileSync once for symbolic-ref
+      // createWorktree calls execFileSync for git worktree add, then validateWorktree
+      // We'll mock all the calls that createWorktree makes
+      vi.mocked(execFileSync)
+        .mockReturnValueOnce("origin/main\n") // detectDefaultBranch symbolic-ref
+        .mockReturnValueOnce("") // git worktree add
+        .mockReturnValueOnce("true"); // sleep (retry backoff)
+
+      // We don't check result.success because validateWorktree fails
+      // (filesystem not mocked), triggering retry logic
+      try {
+        createWorktreeForRalplan("/repo", "Add user authentication");
+      } catch {
+        // Ignore
+      }
+
+      // Verify detectDefaultBranch was called with symbolic-ref
+      const calls = vi.mocked(execFileSync).mock.calls;
+      expect(calls[0][0]).toBe("git");
+      expect(calls[0][1]).toContain("symbolic-ref");
+    });
+
+    it("should return failure when worktree creation fails", () => {
+      vi.mocked(execFileSync).mockImplementation(() => {
+        throw new Error("Git error");
+      });
+
+      const result = createWorktreeForRalplan("/repo", "test plan");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+  });
+
+  describe("detectDefaultBranch()", () => {
+    it("should return symbolic-ref result when available", () => {
+      vi.mocked(execFileSync).mockReturnValueOnce("origin/main\n");
+
+      const result = detectDefaultBranch("/repo");
+
+      expect(result).toBe("main");
+    });
+
+    it("should fall back to branch --show-current", () => {
+      vi.mocked(execFileSync)
+        .mockImplementationOnce(() => {
+          throw new Error("not a symbolic ref");
+        })
+        .mockReturnValueOnce("feature-branch\n");
+
+      const result = detectDefaultBranch("/repo");
+
+      expect(result).toBe("feature-branch");
+    });
+
+    it("should return default branch when all fallbacks fail", () => {
+      vi.mocked(execFileSync).mockImplementation(() => {
+        throw new Error("no git");
+      });
+
+      const result = detectDefaultBranch("/repo");
+
+      expect(result).toBe("main");
     });
   });
 
