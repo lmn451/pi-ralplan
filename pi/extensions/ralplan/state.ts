@@ -53,10 +53,10 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
       parsed.mode = "ralplan";
       // brainstorm and answersPath are undefined — correct for v1
     }
-    // v2 → v3 migration: add worktreePath
+    // v2 → v3 migration: worktreePath field was added in v3
+    // v2 sessions didn't have worktree support, so undefined is correct
     if (parsed.version === 2) {
       parsed.version = 3;
-      // worktreePath will be undefined — correct for v2
     }
     // Validate critical fields
     if (
