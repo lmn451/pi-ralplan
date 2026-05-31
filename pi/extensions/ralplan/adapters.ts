@@ -189,7 +189,13 @@ Read the spec or create one at \`${specPath}\`
 
 ### Part 2: Direct Planning
 
-${getDirectPlanningPrompt(specPath, planPath, context.config.verification !== false ? context.config.verification.maxIterations : 100)}
+${getDirectPlanningPrompt(
+  specPath,
+  planPath,
+  context.config.verification !== false
+    ? context.config.verification.maxIterations
+    : 100,
+)}
 
 Save the plan to: \`${planPath}\`
 

@@ -21,10 +21,6 @@ export const PLAN_CREATED = "PLAN_CREATED";
 export const PLANNING_COMPLETE = "PLANNING_COMPLETE";
 
 /**
- * Detect if a consensus signal (APPROVE/REJECT) is present in text.
- * Uses same boundary-aware detection as other signals.
- */
-/**
  * Detect if a signal is present in text (generic version).
  * Searches only in non-code segments to avoid false positives.
  */
@@ -40,8 +36,8 @@ function detectSignalGeneric(text: string, signal: string): boolean {
 }
 
 /**
- * Detect if a completion signal is present in text for a given stage.
- * @deprecated Use detectSignalGeneric directly with a signal string
+ * Detect if a consensus signal (APPROVED/REJECTED) is present in text.
+ * Uses same boundary-aware detection as other signals.
  */
 export function detectConsensusSignal(text: string, signal: string): boolean {
   return detectSignalGeneric(text, signal);
