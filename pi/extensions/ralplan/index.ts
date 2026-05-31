@@ -859,14 +859,63 @@ ${prompt}`,
     return { action: "continue" };
   });
 
+  // Detect if RALPLAN skill is being used based on prompt content
+  function detectRalplanSkillUsage(
+    prompt: string,
+  ): "ralplan" | "brainstorm" | null {
+    const lower = prompt.toLowerCase();
+
+    // Explicit skill invocations
+    if (lower.includes("ralplan") || lower.includes("/ralplan")) {
+      // Check if it's brainstorm specifically
+      if (lower.includes("brainstorm")) return "brainstorm";
+      return "ralplan";
+    }
+
+    // Standalone brainstorm keyword (RALPLAN brainstorm mode)
+    if (lower.includes("brainstorm")) {
+      return "brainstorm";
+    }
+
+    // Consensus planning keywords
+    if (
+      lower.includes("consensus planning") ||
+      lower.includes("architect review") ||
+      lower.includes("critic review") ||
+      (lower.includes("planner") &&
+        lower.includes("architect") &&
+        lower.includes("critic"))
+    ) {
+      return "ralplan";
+    }
+
+    // Plan artifact paths
+    if (
+      lower.includes("plans/drafts/") ||
+      lower.includes("plans/spec") ||
+      lower.includes("plans/plan") ||
+      lower.includes("plan.md")
+    ) {
+      return "ralplan";
+    }
+
+    return null;
+  }
+
   // Inject stage prompt before agent starts
   pi.on("before_agent_start", async (event, ctx) => {
-    // Auto-start from --ralplan or --brainstorm flag on first prompt
+    // Auto-start from --ralplan flag, --brainstorm flag, or skill usage detection
     if (!isActive() && autoStartMode === null) {
       if (pi.getFlag("ralplan") === true) {
         autoStartMode = "ralplan";
       } else if (pi.getFlag("brainstorm") === true) {
         autoStartMode = "brainstorm";
+      } else {
+        // Detect skill usage from prompt content
+        const detected = detectRalplanSkillUsage(event.prompt);
+        if (detected) {
+          autoStartMode = detected;
+        }
       }
     }
 
