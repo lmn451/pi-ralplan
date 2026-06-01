@@ -1094,20 +1094,20 @@ ${prompt}`,
             persistState();
             updateUI(ctx);
 
-            // Send awaiting prompt to user
-            // Defer via setTimeout to escape agent_end phase where isStreaming
-            // is still true — without this the message goes to the dead followUpQueue
-            // and only appears on the NEXT user prompt.
-            setTimeout(() => {
-              pi.sendMessage(
-                {
-                  customType: "brainstorm-awaiting",
-                  content: getBrainstormAwaitingPrompt(questions),
-                  display: true,
-                },
-                { triggerTurn: false },
-              );
-            }, 0);
+            // Send awaiting prompt to user.
+            // Called from agent_end — by the time we reach here, isStreaming is false,
+            // so the message goes to the "else" branch (push to messages) per the
+            // current pi API. No setTimeout needed.
+            pi.sendMessage(
+              {
+                customType: "brainstorm-awaiting",
+                content: getBrainstormAwaitingPrompt(questions),
+                display: true,
+              },
+              { triggerTurn: false },
+            );
+            return;
+
             return;
           }
           // Other signals suppressed during expanding
@@ -1137,48 +1137,45 @@ ${prompt}`,
       state.pipeline = result.tracking;
       persistState();
       updateUI(ctx);
-
       if (result.phase === "complete") {
         ctx.ui.notify(
           "RALPLAN Pipeline Complete! ✓ All stages finished successfully.",
           "info",
         );
-        // Defer via setTimeout to escape agent_end phase where isStreaming
-        // is still true — without this the message goes to the dead followUpQueue
-        // and only appears on the NEXT user prompt.
-        setTimeout(() => {
-          pi.sendMessage(
-            {
-              customType: "ralplan-complete",
-              content: `## RALPLAN Pipeline Complete! ✓
+        // No setTimeout needed: in agent_end, isStreaming is false by the time we
+        // reach here, so the message routes through the "else" branch and is
+        // appended to the session.
+        pi.sendMessage(
+          {
+            customType: "ralplan-complete",
+            content: `## RALPLAN Pipeline Complete! ✓
 
 All stages finished successfully.`,
-              display: true,
-            },
-            { triggerTurn: false },
-          );
-        }, 0);
+            display: true,
+          },
+          { triggerTurn: false },
+        );
+        deactivateState(ctx);
+
         deactivateState(ctx);
         updateUI(ctx);
         return;
       }
 
       if (result.phase === "failed") {
-        // Defer via setTimeout to escape agent_end phase — same fix as ralplan-complete.
-        setTimeout(() => {
-          pi.sendMessage(
-            {
-              customType: "ralplan-failed",
-              content: `## RALPLAN Pipeline Failed
+        // Same reasoning as the "complete" branch above — no setTimeout needed.
+        pi.sendMessage(
+          {
+            customType: "ralplan-failed",
+            content: `## RALPLAN Pipeline Failed
 
 Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
-              display: true,
-            },
-            { triggerTurn: false },
-          );
-        }, 0);
+            display: true,
+          },
+          { triggerTurn: false },
+        );
         deactivateState(ctx);
-        updateUI(ctx);
+
         return;
       }
 
@@ -1186,15 +1183,14 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
       if (pipelineContext && result.adapter) {
         const prompt = result.adapter.getPrompt(pipelineContext);
         const transitionText = `${getTransitionPrompt(currentId, result.adapter.id)}\n\n${prompt}`;
-        // Defer via setTimeout to escape agent_end phase where isStreaming
-        // is still true — without this the transition goes to the dead followUpQueue
-        // and the next stage never starts until the user sends a message.
-        setTimeout(() => {
-          pi.sendUserMessage(transitionText);
-        }, 0);
+        // No setTimeout needed: in agent_end, isStreaming is false by the time we
+        // reach here, so sendUserMessage routes through the normal prompt path.
+        // (See comments in the "complete"/"failed" branches above.)
+        pi.sendUserMessage(transitionText);
       }
     }
   });
+
 
   // Restore state on session start / resume / fork
   pi.on("session_start", async (_event, ctx) => {
