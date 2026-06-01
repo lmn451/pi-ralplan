@@ -102,6 +102,26 @@ interface PersistedState {
   worktreePath?: string; // NEW: Associated worktree
 }
 
+/**
+ * Type guard for session-entry data. Mirrors the critical-field validation
+ * in `state.ts:validateRalplanState` so a malformed entry falls back to
+ * the file-based state instead of crashing the extension.
+ */
+function isPersistedState(x: unknown): x is PersistedState {
+  if (typeof x !== "object" || x === null) return false;
+  const obj = x as Record<string, unknown>;
+  if (typeof obj.active !== "boolean") return false;
+  if (typeof obj.tracking !== "object" || obj.tracking === null) return false;
+  if (!Array.isArray((obj.tracking as Record<string, unknown>).stages)) return false;
+  if (typeof obj.originalIdea !== "string") return false;
+  if (typeof obj.specPath !== "string") return false;
+  if (typeof obj.planPath !== "string") return false;
+  if (obj.mode !== undefined && typeof obj.mode !== "string") return false;
+  if (obj.sessionId !== undefined && typeof obj.sessionId !== "string") return false;
+  return true;
+}
+
+
 const CUSTOM_TYPE = "ralplan-state";
 
 // ============================================================================
@@ -253,14 +273,16 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   function reconstructFromSession(ctx: ExtensionContext): void {
     const entries = ctx.sessionManager.getEntries();
 
-    // Find the most recent ralplan-state entry
+    // Find the most recent ralplan-state entry, validated by type guard
+    // (T-7). Malformed entries fall through to the file-based fallback below.
     const ralplanEntry = entries
       .filter((e) => e.type === "custom" && e.customType === CUSTOM_TYPE)
-      .pop() as { data?: PersistedState } | undefined;
+      .pop();
+    const data = ralplanEntry?.data;
+    if (isPersistedState(data)) {
 
-    if (ralplanEntry?.data) {
-      const data = ralplanEntry.data;
       const status = getPipelineStatus(data.tracking);
+
       state = {
         version: 3,
         active: status.isComplete ? false : data.active,

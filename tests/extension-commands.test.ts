@@ -522,5 +522,58 @@ describe("ralplan before_agent_start (T-5 regression)", () => {
       chdir(prev);
       rmSync(dir, { recursive: true, force: true });
     }
+});
+});
+
+describe("reconstructFromSession with malformed entries (T-7)", () => {
+
+  function makeReconstructStubPi(sessionEntries: unknown[]) {
+    const eventHandlers: Map<string, (event: any, ctx: any) => Promise<any>> = new Map();
+    const pi = {
+      registerFlag() {},
+      registerCommand() {},
+      registerTool() {},
+      appendEntry() {},
+      sendMessage() {},
+      sendUserMessage() {},
+      on(event: string, handler: any) {
+        eventHandlers.set(event, handler);
+      },
+      getFlag() {
+        return undefined;
+      },
+      sessionManager: {
+        getEntries: () => sessionEntries,
+        getBranch: () => sessionEntries,
+      },
+    };
+    return { pi, eventHandlers };
+  }
+
+  it("does not crash on a malformed ralplan-state entry (T-7)", async () => {
+    const malformed = {
+      type: "custom",
+      customType: "ralplan-state",
+      // data field is intentionally missing the required shape
+    };
+    const { pi, eventHandlers } = makeReconstructStubPi([malformed]);
+    const ctx = {
+      ui: {
+        notify: () => {},
+        setStatus: () => {},
+        setWidget: () => {},
+        theme: { fg: (_: string, text: string) => text },
+        confirm: async () => true,
+      },
+      sessionManager: pi.sessionManager,
+    };
+
+    ralplanExtension(pi as never);
+
+    const handler = eventHandlers.get("session_start");
+    expect(handler).toBeDefined();
+
+    await expect(handler!({}, ctx)).resolves.not.toThrow();
   });
 });
+
