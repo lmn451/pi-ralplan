@@ -242,12 +242,10 @@ export const executionAdapter: PipelineStageAdapter = {
     );
     if (result.success && result.path) {
       context.worktreePath = result.path;
-      console.log(
-        `[ralplan] Worktree created at execution entry: ${result.path}`,
-      );
-    } else {
-      console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
     }
+    // Failure: worktreePath stays undefined. onEnter has no ctx so no UI
+    // notification is possible here. Downstream artifact writes will surface
+    // the problem.
   },
 
   getPrompt(context: PipelineContext): string {

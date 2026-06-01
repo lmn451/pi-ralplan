@@ -176,16 +176,22 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     writeRalplanStateFile(sessionCwd, state);
   }
 
-  function deactivateState(): void {
+  function deactivateState(notifyCtx?: ExtensionContext): void {
     if (state) {
       // Best-effort worktree cleanup — warn but don't block deactivation
       if (state.worktreePath) {
         try {
           const result = cleanupWorktree(state.worktreePath);
           if (!result.success) {
-            console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
+            notifyCtx?.ui.notify(
+              `Worktree cleanup failed: ${result.error}`,
+              "warning",
+            );
           } else {
-            console.log(`[ralplan] Worktree cleaned up: ${state.worktreePath}`);
+            notifyCtx?.ui.notify(
+              `Worktree cleaned up: ${state.worktreePath}`,
+              "info",
+            );
           }
         } catch {
           // cleanup not available or already removed
@@ -323,10 +329,11 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       // Create worktree (guards against double-creation in executionAdapter.onEnter)
       const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
       if (worktreeResult.success && worktreeResult.path) {
-        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+        ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
       } else {
-        console.warn(
-          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+        ctx.ui.notify(
+          `Worktree creation failed: ${worktreeResult.error}`,
+          "warning",
         );
       }
 
@@ -398,10 +405,11 @@ ${prompt}`,
       // Create worktree (guards against double-creation in executionAdapter.onEnter)
       const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
       if (worktreeResult.success) {
-        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+        ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
       } else {
-        console.warn(
-          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+        ctx.ui.notify(
+          `Worktree creation failed: ${worktreeResult.error}`,
+          "warning",
         );
       }
 
@@ -482,7 +490,7 @@ ${prompt}`,
       );
       if (!ok) return;
 
-      deactivateState();
+      deactivateState(ctx);
       updateUI(ctx);
       ctx.ui.notify("RALPLAN cancelled.", "info");
     },
@@ -505,7 +513,7 @@ ${prompt}`,
 
       if (result.phase === "complete") {
         ctx.ui.notify("RALPLAN pipeline complete!", "info");
-        deactivateState();
+        deactivateState(ctx);
         return;
       }
 
@@ -514,7 +522,7 @@ ${prompt}`,
           `RALPLAN stage failed: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
           "error",
         );
-        deactivateState();
+        deactivateState(ctx);
         return;
       }
 
@@ -679,7 +687,7 @@ ${prompt}`,
       updateUI(ctx);
 
       if (result.phase === "complete") {
-        deactivateState();
+        deactivateState(ctx);
         return {
           content: [
             {
@@ -692,7 +700,7 @@ ${prompt}`,
       }
 
       if (result.phase === "failed") {
-        deactivateState();
+        deactivateState(ctx);
         return {
           content: [
             {
@@ -952,11 +960,8 @@ ${prompt}`,
       // Create worktree (guards against double-creation in executionAdapter.onEnter)
       const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
       if (worktreeResult.success) {
-        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+        ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
       } else {
-        console.warn(
-          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
-        );
         ctx.ui.notify(
           `Worktree creation failed: ${worktreeResult.error}`,
           "warning",
@@ -1153,7 +1158,7 @@ All stages finished successfully.`,
             { triggerTurn: false },
           );
         }, 0);
-        deactivateState();
+        deactivateState(ctx);
         updateUI(ctx);
         return;
       }
@@ -1172,7 +1177,7 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
             { triggerTurn: false },
           );
         }, 0);
-        deactivateState();
+        deactivateState(ctx);
         updateUI(ctx);
         return;
       }

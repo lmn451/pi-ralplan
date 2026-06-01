@@ -66,18 +66,12 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
       (parsed.sessionId != null && typeof parsed.sessionId !== "string") ||
       typeof parsed.mode !== "string"
     ) {
-      console.warn("[ralplan] State file has invalid shape, treating as empty");
       return null;
     }
 
     return parsed as unknown as RalplanState;
-  } catch (error) {
-    // State file read failed - could be corruption, permissions, etc.
-    // Return null to treat as no state
-    console.warn(
-      "[ralplan] Failed to read state file:",
-      error instanceof Error ? error.message : error,
-    );
+  } catch {
+    // State file read failed (corruption, permissions, etc.) — caller handles null gracefully
     return null;
   }
 }
