@@ -904,17 +904,22 @@ ${prompt}`,
 
   // Inject stage prompt before agent starts
   pi.on("before_agent_start", async (event, ctx) => {
-    // Auto-start from --ralplan flag, --brainstorm flag, or skill usage detection
+    // Auto-start from --ralplan flag or --brainstorm flag only.
+    // (skill usage from prompt content no longer auto-starts — it only notifies)
     if (!isActive() && autoStartMode === null) {
       if (pi.getFlag("ralplan") === true) {
         autoStartMode = "ralplan";
       } else if (pi.getFlag("brainstorm") === true) {
         autoStartMode = "brainstorm";
       } else {
-        // Detect skill usage from prompt content
+        // Detect skill usage from prompt content. If matched, suggest /ralplan
+        // explicitly — do NOT auto-start (avoids surprise planning sessions).
         const detected = detectRalplanSkillUsage(event.prompt);
         if (detected) {
-          autoStartMode = detected;
+          ctx.ui.notify(
+            "This prompt mentions RALPLAN. Run /ralplan to start a planning session.",
+            "info",
+          );
         }
       }
     }

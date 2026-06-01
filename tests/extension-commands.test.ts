@@ -392,3 +392,135 @@ describe("ralplan extension command handlers", () => {
     });
   });
 });
+
+// ============================================================================
+// T-5: Auto-start regression — prompt-content must NOT trigger, flag must
+// ============================================================================
+
+describe("ralplan before_agent_start (T-5 regression)", () => {
+  function makeFlagStubPi(flagValue: boolean | undefined) {
+    const commands = new Map<string, any>();
+    const tools = new Map<string, any>();
+    const entries: Array<{ type: string; customType?: string; data?: unknown }> = [];
+    let sessionBranch: typeof entries = [];
+    const sessionManager = {
+      getEntries: () => entries,
+      getBranch: () => sessionBranch,
+      addEntry: (e: (typeof entries)[0]) => {
+        entries.push(e);
+        sessionBranch.push(e);
+      },
+    };
+    const eventHandlers: Map<string, (event: any, ctx: any) => Promise<any>> = new Map();
+    const pi = {
+      registerFlag() {},
+      registerCommand(name: string, def: any) {
+        commands.set(name, def);
+      },
+      registerTool(def: any) {
+        tools.set(def.name, def);
+      },
+      appendEntry() {},
+      sendMessage() {},
+      sendUserMessage() {},
+      on(event: string, handler: any) {
+        eventHandlers.set(event, handler);
+      },
+      getFlag(_name: string) {
+        return flagValue;
+      },
+      sessionManager,
+    };
+    return { pi, commands, tools, eventHandlers };
+  }
+
+  it("does NOT auto-start when prompt contains 'ralplan' but no flag is set", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ralplan-noflag-"));
+    const prev = cwd();
+    try {
+      const repo = join(dir, "repo");
+      mkdirSync(repo, { recursive: true });
+      chdir(repo);
+      execSync("git init -b main", { stdio: "pipe" });
+      execSync("git config user.email test@example.com", { stdio: "pipe" });
+      execSync("git config user.name test", { stdio: "pipe" });
+      writeFileSync("README.md", "x\n", "utf-8");
+      execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+
+      const { pi, eventHandlers } = makeFlagStubPi(undefined);
+      const notifyCalls: Array<[string, string]> = [];
+      const ctx = {
+        ui: {
+          notify: (msg: string, level: string) => notifyCalls.push([msg, level]),
+          setStatus() {},
+          setWidget() {},
+          theme: { fg: (_: string, text: string) => text },
+          confirm: async () => true,
+        },
+        sessionManager: pi.sessionManager,
+      };
+
+      ralplanExtension(pi as never);
+
+      const handler = eventHandlers.get("before_agent_start");
+      expect(handler).toBeDefined();
+
+      await handler!({ prompt: "use ralplan to plan this thing" }, ctx);
+
+      // No session entry was appended
+      const ralplanEntries = pi.sessionManager
+        .getEntries()
+        .filter((e) => e.type === "custom" && e.customType === "ralplan-state");
+      expect(ralplanEntries).toHaveLength(0);
+
+      // A notification was shown
+      const suggestion = notifyCalls.find(([msg]) => msg.includes("/ralplan"));
+      expect(suggestion).toBeDefined();
+    } finally {
+      chdir(prev);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("DOES auto-start when --ralplan flag is set even if prompt contains the keyword", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ralplan-flag-"));
+    const prev = cwd();
+    try {
+      const repo = join(dir, "repo");
+      mkdirSync(repo, { recursive: true });
+      chdir(repo);
+      execSync("git init -b main", { stdio: "pipe" });
+      execSync("git config user.email test@example.com", { stdio: "pipe" });
+      execSync("git config user.name test", { stdio: "pipe" });
+      writeFileSync("README.md", "x\n", "utf-8");
+      execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+
+      const { pi, eventHandlers } = makeFlagStubPi(true);
+      const notifyCalls: Array<[string, string]> = [];
+      const ctx = {
+        ui: {
+          notify: (msg: string, level: string) => notifyCalls.push([msg, level]),
+          setStatus() {},
+          setWidget() {},
+          theme: { fg: (_: string, text: string) => text },
+          confirm: async () => true,
+        },
+        sessionManager: pi.sessionManager,
+      };
+
+      ralplanExtension(pi as never);
+
+      const handler = eventHandlers.get("before_agent_start");
+      expect(handler).toBeDefined();
+
+      await handler!({ prompt: "build me a thing" }, ctx);
+
+      // Flag path still works — a RALPLAN started notification is sent
+      const started = notifyCalls.find(([msg]) => msg.includes("RALPLAN started"));
+      expect(started).toBeDefined();
+    } finally {
+      chdir(prev);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

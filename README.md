@@ -59,6 +59,9 @@ Or start Pi with the flag:
 ```bash
 pi --ralplan "build me a todo app"
 ```
+```
+
+> **Note:** `/ralplan` must be invoked explicitly. The extension no longer auto-starts when a prompt mentions `ralplan`, `brainstorm`, `consensus planning`, or related terms — it shows a notification suggesting you use the slash command. Use `pi --ralplan "..."` or `pi --brainstorm "..."` for the same effect from the CLI.
 
 ### Commands
 
