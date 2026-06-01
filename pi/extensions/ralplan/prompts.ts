@@ -382,10 +382,12 @@ export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
     "schema",
     "database",
     "production",
+    "remove",
     "destroy",
     "delete",
     "rm",
     "compliance",
+
     "PII",
     "GDPR",
     "HIPAA",
@@ -393,7 +395,19 @@ export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
     "breaking change",
   ];
   const idea = context.idea.toLowerCase();
-  const isDeliberate = deliberateSignals.some((s) => idea.includes(s));
+  // Word-boundary match for short tokens prevents false positives.
+  // Without \b, "rm" matches "format"/"thermostat"/"charm"; "auth" matches
+  // "author"/"authority". Long tokens (remove/destroy/delete) are unchanged.
+  //
+  // The "auth" case is special: the longer word "authentication" is a true
+  // positive but a word-boundary check on "auth" rejects it. So we treat
+  // "auth" as a prefix match against the legitimate auth-related suffixes.
+  const isDeliberate = deliberateSignals.some((s) => {
+    if (s === "auth") return /\bauth(entication|orization|orize|entic)?\b/.test(idea);
+
+    return s.length <= 4 ? new RegExp(`\\b${s}\\b`).test(idea) : idea.includes(s);
+  });
+
 
   return `
 ### RALPLAN-DR Summary (REQUIRED — generate before Architect review)

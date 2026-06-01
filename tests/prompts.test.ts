@@ -110,6 +110,55 @@ describe("RALPLAN-DR summary template", () => {
     expect(prompt).not.toContain("Expanded Test Plan");
   });
 
+  // T-2: false-positive regressions for short DELIBERATE signals.
+  // Without word-boundary matching, "rm" matched "format"/"thermostat"/"charm" etc.
+  // Without word-boundary matching, "auth" matched "author"/"authority" etc.
+  // (See plans/spec-2026-06-01-v2.md AC-15.1.)
+  const SHORT_BASE_CONFIG = DEFAULT_PIPELINE_CONFIG;
+  for (const [idea, why] of [
+    ["format the disk", "'rm' must not match 'format'"],
+    ["build a small thermostat", "'rm' must not match 'thermostat'"],
+    ["install alarm system", "'rm' must not match 'alarm'"],
+    ["add charm bracelet feature", "'rm' must not match 'charm'"],
+    ["show author byline", "'auth' must not match 'author'"],
+    ["fix germ theory bug", "'rm' must not match 'germ'"],
+  ] as const) {
+    it(`does NOT trigger DELIBERATE for: ${idea} (${why})`, () => {
+      const prompt = getRalplanDRSummaryTemplate({
+        idea,
+        directory: "/tmp/worktree",
+        cwd: "/tmp/worktree",
+        config: buildPipelineTracking(SHORT_BASE_CONFIG).pipelineConfig,
+        mode: "ralplan",
+      });
+      expect(prompt).toContain("SHORT");
+      expect(prompt).not.toContain("DELIBERATE (high-risk signals detected)");
+    });
+  }
+
+  // T-2: positive cases must still trigger DELIBERATE.
+  it("DOES trigger DELIBERATE for 'please remove the user table'", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "please remove the user table",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
+  });
+  it("DOES trigger DELIBERATE for 'rm -rf /tmp'", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "rm -rf /tmp",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
+  });
+
+
   it("requires at least 2 viable options", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "add caching layer",

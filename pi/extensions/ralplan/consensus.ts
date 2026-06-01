@@ -1,4 +1,6 @@
-// ============================================================================
+// Retained for test fixtures (type-only production import via state.ts).
+// See plans/spec-2026-06-01-v2.md ADR-0004.
+
 // CONSENSUS LOOP — Planner → Architect → Critic iteration with approval tracking
 // ============================================================================
 

@@ -165,7 +165,37 @@ branch refs/heads/feature
 
       expect(result).toEqual([]);
     });
+    it("should return empty array on git error", () => {
+      vi.mocked(execFileSync).mockImplementationOnce(() => {
+        throw new Error("git not found");
+      });
+
+      const result = listWorktrees();
+
+      expect(result).toEqual([]);
+    });
   });
+
+  // T-3: parseWorktreeEntry returns the worktree path, not the gitdir.
+  // Regression for the bug where listWorktrees() returned the resolved
+  // gitdir path (inside the main repo's .git/) when gitdir differed from
+  // worktree. Real-world porcelain output has a gitdir: line that points
+  // to .git/worktrees/<name> while the worktree itself lives elsewhere.
+  describe("parseWorktreeEntry (real-world porcelain with gitdir)", () => {
+    it("returns the worktree path, not the gitdir", () => {
+      vi.mocked(execFileSync).mockReturnValueOnce(`
+worktree /home/user/repo.worktrees/feature-x
+HEAD abc123
+branch refs/heads/feature-x
+gitdir /home/user/repo/.git/worktrees/feature-x
+`);
+
+      const result = listWorktrees();
+
+      expect(result).toEqual(["/home/user/repo.worktrees/feature-x"]);
+    });
+  });
+
 
   describe("cleanupWorktree()", () => {
     it("should remove worktree successfully", () => {

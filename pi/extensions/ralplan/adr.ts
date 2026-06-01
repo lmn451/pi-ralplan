@@ -1,6 +1,9 @@
+// Retained for test fixtures (no production import).
+// See plans/spec-2026-06-01-v2.md ADR-0004.
 /**
  * Architecture Decision Record (ADR) utilities.
  */
+
 
 import { randomUUID } from "node:crypto";
 

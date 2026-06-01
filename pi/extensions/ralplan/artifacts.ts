@@ -138,7 +138,9 @@ export function readPlanningArtifacts(cwd: string): PlanningArtifacts {
   };
 }
 
-/** Returns true when latest spec and plan contain required quality-gate sections */
+// Retained for test fixtures (no production caller).
+// See plans/spec-2026-06-01-v2.md ADR-0004.
+
 export function isPlanningComplete(artifacts: PlanningArtifacts): boolean {
   if (artifacts.specPaths.length === 0 || artifacts.planPaths.length === 0) {
     return false;
