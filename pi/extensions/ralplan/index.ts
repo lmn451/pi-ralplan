@@ -61,7 +61,10 @@ import {
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 import { resolveOpenQuestionsPath } from "./utils.js";
 
-import { createWorktreeForRalplan, cleanupWorktree } from "./worktree.js";
+import { cleanupWorktree } from "./worktree.js";
+
+import { createAndAttachWorktree } from "./worktree-helper.js";
+
 
 import {
   createBrainstormState,
@@ -326,16 +329,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
           new Date().toISOString();
       }
 
-      // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-      if (worktreeResult.success && worktreeResult.path) {
-        ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
-      } else {
-        ctx.ui.notify(
-          `Worktree creation failed: ${worktreeResult.error}`,
-          "warning",
-        );
-      }
+      // Create worktree via helper (T-6 DRY).
+      const worktree = createAndAttachWorktree(ctx, sessionCwd, idea);
+
 
       state = buildDefaultState(
         idea,
@@ -344,9 +340,8 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         "ralplan",
         sessionCwd,
       );
-      state.worktreePath = worktreeResult.success
-        ? worktreeResult.path
-        : undefined;
+      state.worktreePath = worktree.ok ? worktree.path : undefined;
+
       persistState();
       updateUI(ctx);
 
@@ -402,16 +397,9 @@ ${prompt}`,
         tracking.stages[tracking.currentStageIndex].startedAt =
           new Date().toISOString();
       }
-      // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-      if (worktreeResult.success) {
-        ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
-      } else {
-        ctx.ui.notify(
-          `Worktree creation failed: ${worktreeResult.error}`,
-          "warning",
-        );
-      }
+      // Create worktree via helper (T-6 DRY).
+      const worktree = createAndAttachWorktree(ctx, sessionCwd, idea);
+
 
       state = buildDefaultState(
         idea,
@@ -420,9 +408,8 @@ ${prompt}`,
         "brainstorm",
         sessionCwd,
       );
-      state.worktreePath = worktreeResult.success
-        ? worktreeResult.path
-        : undefined;
+      state.worktreePath = worktree.ok ? worktree.path : undefined;
+
       persistState();
       updateUI(ctx);
 
@@ -957,21 +944,13 @@ ${prompt}`,
           new Date().toISOString();
       }
 
-      // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-      if (worktreeResult.success) {
-        ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
-      } else {
-        ctx.ui.notify(
-          `Worktree creation failed: ${worktreeResult.error}`,
-          "warning",
-        );
-      }
+      // Create worktree via helper (T-6 DRY).
+      const worktree = createAndAttachWorktree(ctx, sessionCwd, idea);
+
 
       state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
-      state.worktreePath = worktreeResult.success
-        ? worktreeResult.path
-        : undefined;
+      state.worktreePath = worktree.ok ? worktree.path : undefined;
+
       persistState();
       updateUI(ctx);
 
