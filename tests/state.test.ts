@@ -7,11 +7,14 @@ import {
   writeRalplanStateFile,
   clearRalplanStateFile,
   buildDefaultState,
+  validateRalplanState,
 } from "../pi/extensions/ralplan/state.js";
+
 import {
   buildPipelineTracking,
   DEFAULT_PIPELINE_CONFIG,
 } from "../pi/extensions/ralplan/pipeline.js";
+
 import { getDefaultArtifactFilename } from "../pi/extensions/ralplan/artifacts.js";
 
 let tempDir: string;
@@ -415,3 +418,84 @@ describe("readRalplanStateFile validation", () => {
     });
   });
 });
+
+// T-7.1: validateRalplanState is the shared validation helper used by both
+// readRalplanStateFile and the session-entry type guard. It should reject
+// invalid shapes and migrate v1/v2 to v3.
+describe("validateRalplanState (T-7.1)", () => {
+  it("rejects non-object input", () => {
+    expect(validateRalplanState(null)).toBeNull();
+    expect(validateRalplanState(undefined)).toBeNull();
+    expect(validateRalplanState("string")).toBeNull();
+    expect(validateRalplanState(42)).toBeNull();
+  });
+
+  it("rejects missing required fields", () => {
+    expect(validateRalplanState({})).toBeNull();
+    expect(validateRalplanState({ version: 3 })).toBeNull();
+    expect(
+      validateRalplanState({
+        version: 3,
+        active: "not a bool",
+        pipeline: { stages: [] },
+        mode: "ralplan",
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects missing stages array", () => {
+    expect(
+      validateRalplanState({
+        version: 3,
+        active: true,
+        pipeline: {},
+        mode: "ralplan",
+      }),
+    ).toBeNull();
+  });
+
+  it("migrates v1 to v3 and sets mode='ralplan'", () => {
+    const result = validateRalplanState({
+      version: 1,
+      active: true,
+      pipeline: { stages: [] },
+      mode: "ignored",
+    });
+    expect(result).not.toBeNull();
+    expect(result?.version).toBe(3);
+    expect(result?.mode).toBe("ralplan");
+  });
+
+  it("migrates v2 to v3 without overwriting mode", () => {
+    const result = validateRalplanState({
+      version: 2,
+      active: true,
+      pipeline: { stages: [] },
+      mode: "brainstorm",
+    });
+    expect(result?.version).toBe(3);
+    expect(result?.mode).toBe("brainstorm");
+  });
+
+  it("accepts a valid v3 state", () => {
+    const result = validateRalplanState({
+      version: 3,
+      active: true,
+      pipeline: { stages: [] },
+      mode: "ralplan",
+    });
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects future versions (greater than CURRENT_VERSION=3)", () => {
+    expect(
+      validateRalplanState({
+        version: 99,
+        active: true,
+        pipeline: { stages: [] },
+        mode: "ralplan",
+      }),
+    ).toBeNull();
+  });
+});
+

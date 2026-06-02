@@ -32,6 +32,41 @@ export interface RalplanState {
 }
 
 const CURRENT_VERSION = 3;
+/**
+ * Validate and migrate a parsed state object. Shared by `readRalplanStateFile`
+ * (file-based reader) and the session-entry type guard in `index.ts`.
+ *
+ * Returns the validated/migrated state, or `null` if the input is invalid.
+ */
+export function validateRalplanState(parsed: unknown): RalplanState | null {
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.version !== "number" || obj.version > CURRENT_VERSION) {
+    // Future version, can't read
+    return null;
+  }
+  // v1 → v2 migration
+  if (obj.version === 1) {
+    obj.version = 2;
+    obj.mode = "ralplan";
+    // brainstorm and answersPath are undefined — correct for v1
+  }
+  // v2 → v3 migration: worktreePath field was added in v3
+  if (obj.version === 2) {
+    obj.version = 3;
+  }
+  // Validate critical fields
+  if (
+    typeof obj.active !== "boolean" ||
+    typeof obj.pipeline !== "object" ||
+    !Array.isArray((obj.pipeline as Record<string, unknown>)?.stages) ||
+    (obj.sessionId != null && typeof obj.sessionId !== "string") ||
+    typeof obj.mode !== "string"
+  ) {
+    return null;
+  }
+  return obj as unknown as RalplanState;
+}
 
 /** Read ralplan state from file */
 export function readRalplanStateFile(directory: string): RalplanState | null {
@@ -39,48 +74,14 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
   if (!existsSync(path)) return null;
   try {
     const raw = readFileSync(path, "utf-8");
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (
-      typeof parsed.version !== "number" ||
-      parsed.version > CURRENT_VERSION
-    ) {
-      // Future version, can't read
-      return null;
-    }
-    // v1 → v2 migration
-    if (parsed.version === 1) {
-      parsed.version = 2;
-      parsed.mode = "ralplan";
-      // brainstorm and answersPath are undefined — correct for v1
-    }
-    // v2 → v3 migration: worktreePath field was added in v3
-    // v2 sessions didn't have worktree support, so undefined is correct
-    if (parsed.version === 2) {
-      parsed.version = 3;
-    }
-    // Validate critical fields
-    if (
-      typeof parsed.active !== "boolean" ||
-      typeof parsed.pipeline !== "object" ||
-      !Array.isArray((parsed.pipeline as Record<string, unknown>)?.stages) ||
-      (parsed.sessionId != null && typeof parsed.sessionId !== "string") ||
-      typeof parsed.mode !== "string"
-    ) {
-      console.warn("[ralplan] State file has invalid shape, treating as empty");
-      return null;
-    }
-
-    return parsed as unknown as RalplanState;
-  } catch (error) {
-    // State file read failed - could be corruption, permissions, etc.
-    // Return null to treat as no state
-    console.warn(
-      "[ralplan] Failed to read state file:",
-      error instanceof Error ? error.message : error,
-    );
+    const parsed = JSON.parse(raw);
+    return validateRalplanState(parsed);
+  } catch {
+    // State file read failed (corruption, permissions, etc.) — caller handles null gracefully
     return null;
   }
 }
+
 
 /** Write ralplan state to file */
 export function writeRalplanStateFile(

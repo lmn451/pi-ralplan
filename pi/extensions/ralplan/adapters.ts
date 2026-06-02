@@ -4,9 +4,11 @@ import type {
   PipelineConfig,
   PipelineContext,
 } from "./pipeline.js";
+import { getStageMaxIterations } from "./pipeline.js";
 import {
   getConsensusPlanningPrompt,
   getDirectPlanningPrompt,
+
   getExecutionPrompt,
   getRalphPrompt,
   getQAPrompt,
@@ -192,9 +194,8 @@ Read the spec or create one at \`${specPath}\`
 ${getDirectPlanningPrompt(
   specPath,
   planPath,
-  context.config.verification !== false
-    ? context.config.verification.maxIterations
-    : 100,
+  getStageMaxIterations("ralplan", context.config),
+
 )}
 
 Save the plan to: \`${planPath}\`
@@ -242,12 +243,10 @@ export const executionAdapter: PipelineStageAdapter = {
     );
     if (result.success && result.path) {
       context.worktreePath = result.path;
-      console.log(
-        `[ralplan] Worktree created at execution entry: ${result.path}`,
-      );
-    } else {
-      console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
     }
+    // Failure: worktreePath stays undefined. onEnter has no ctx so no UI
+    // notification is possible here. Downstream artifact writes will surface
+    // the problem.
   },
 
   getPrompt(context: PipelineContext): string {
@@ -274,10 +273,8 @@ export const ralphAdapter: PipelineStageAdapter = {
 
   getPrompt(context: PipelineContext): string {
     const specPath = context.specPath || "plans/spec.md";
-    const maxIterations =
-      context.config.verification !== false
-        ? context.config.verification.maxIterations
-        : 100;
+    const maxIterations = getStageMaxIterations("ralph", context.config);
+
     const cwdNote =
       context.cwd !== context.directory
         ? `\n\n**Working Directory:** All verification MUST happen in \`${context.cwd}\`.\n`

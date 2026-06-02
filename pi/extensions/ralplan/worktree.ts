@@ -10,8 +10,25 @@ import { resolveWorktreeRoot } from "./utils.js";
 
 // Default worktree settings
 export const DEFAULT_BASE_BRANCH = "main";
-export const DEFAULT_CREATE_BRANCH = true;
 export const DEFAULT_AUTO_CLEANUP = false;
+
+// T-9.1: module-level autoCleanup flag, mutable via setAutoCleanup for
+// tests. The default (false) preserves user artifacts (spec/plan/answers)
+// in the worktree after pipeline completion. Set to true to opt into
+// automatic cleanup. (Production code should leave it at the default;
+// a v3 round may introduce proper per-session config.)
+let _autoCleanup = DEFAULT_AUTO_CLEANUP;
+
+/** Set the runtime autoCleanup flag. Used by tests; production should leave at the default. */
+export function setAutoCleanup(value: boolean): void {
+  _autoCleanup = value;
+}
+
+/** Get the current autoCleanup flag. Read by `deactivateState` to decide whether to clean up. */
+export function getAutoCleanup(): boolean {
+  return _autoCleanup;
+}
+
 
 export interface WorktreeConfig {
   baseBranch: string;
@@ -201,24 +218,24 @@ export function createWorktree(
   };
 }
 
+// Retained for test fixtures. See plans/spec-2026-06-01-v2.md ADR-0004.
 function parseWorktreeEntry(entry: string): string {
   const pathMatch = entry.match(/^worktree\s+(.+)$/m);
   if (!pathMatch) return "";
-  let worktreePath = pathMatch[1].trim();
-  // Check if there's a gitdir reference pointing to a different location
-  const gitdirMatch = entry.match(/^gitdir\s+(.+)$/m);
-  if (gitdirMatch) {
-    const gitdirPath = gitdirMatch[1].trim();
-    // If gitdir is relative, resolve it relative to the worktree path
-    if (!resolve(gitdirPath).startsWith(resolve(worktreePath))) {
-      // The gitdir is in a different location, resolve it
-      worktreePath = resolve(worktreePath, gitdirPath);
-    }
-  }
-  return worktreePath;
+  // Return the worktree path; ignore the gitdir reference for path resolution.
+  // (Previously, when gitdir differed from worktree, this function would resolve
+  // and return the gitdir path — which lives inside the main repo's .git/ —
+  // instead of the worktree's filesystem path. The fix returns just the
+  // worktree path. Gitdir is only metadata about where git stores its
+  // internal state for the worktree, not where the worktree is on disk.)
+  return pathMatch[1].trim();
 }
 
+
+// Retained for test fixtures (no production caller).
+// See plans/spec-2026-06-01-v2.md ADR-0004.
 export function listWorktrees(): string[] {
+
   try {
     const output = execFileSync("git", ["worktree", "list", "--porcelain"], {
       encoding: "utf-8",

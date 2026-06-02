@@ -42,6 +42,39 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
   qa: true,
 };
 
+/** Default cap for stages that don't have a stage-specific override. */
+export const DEFAULT_STAGE_MAX_ITERATIONS = 100;
+
+/**
+ * Per-stage iteration caps. The QA stage hardcodes 5 cycles (per the QA
+ * prompt template). Other stages use `DEFAULT_STAGE_MAX_ITERATIONS`
+ * unless the config specifies otherwise (currently only `verification`).
+ *
+ * Single source of truth used by:
+ * - `adapters.ts` — the RALPH/QA prompt templates (so the prompt
+ *   tells the LLM how many iterations to use)
+ * - `index.ts:turn_end` — the runtime check that escalates to the
+ *   user when iterations are exhausted
+ */
+export function getStageMaxIterations(
+  stageId: PipelineStageId,
+  config: PipelineConfig,
+): number {
+  switch (stageId) {
+    case "ralph":
+      return config.verification && typeof config.verification === "object"
+        ? config.verification.maxIterations
+        : DEFAULT_STAGE_MAX_ITERATIONS;
+    case "qa":
+      return 5;
+    case "ralplan":
+    case "execution":
+    default:
+      return DEFAULT_STAGE_MAX_ITERATIONS;
+  }
+}
+
+
 export interface PipelineContext {
   idea: string;
   directory: string;
