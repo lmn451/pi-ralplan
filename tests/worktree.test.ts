@@ -256,3 +256,26 @@ gitdir /home/user/repo/.git/worktrees/feature-x
     });
   });
 });
+
+// T-9.1: autoCleanup flag is mutable via setAutoCleanup, default false.
+describe("autoCleanup flag (T-9.1)", () => {
+  it("defaults to false (preserves user artifacts)", async () => {
+    const { getAutoCleanup, setAutoCleanup, DEFAULT_AUTO_CLEANUP } = await import(
+      "../pi/extensions/ralplan/worktree.js"
+    );
+    // Reset in case a prior test mutated it
+    setAutoCleanup(DEFAULT_AUTO_CLEANUP);
+    expect(getAutoCleanup()).toBe(false);
+  });
+
+  it("can be toggled on/off via setAutoCleanup", async () => {
+    const { getAutoCleanup, setAutoCleanup } = await import(
+      "../pi/extensions/ralplan/worktree.js"
+    );
+    setAutoCleanup(true);
+    expect(getAutoCleanup()).toBe(true);
+    setAutoCleanup(false);
+    expect(getAutoCleanup()).toBe(false);
+  });
+});
+

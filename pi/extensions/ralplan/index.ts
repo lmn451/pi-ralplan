@@ -63,7 +63,8 @@ import {
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 import { resolveOpenQuestionsPath } from "./utils.js";
 
-import { cleanupWorktree } from "./worktree.js";
+import { cleanupWorktree, getAutoCleanup } from "./worktree.js";
+
 
 import { createAndAttachWorktree } from "./worktree-helper.js";
 
@@ -200,11 +201,21 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     pi.appendEntry(CUSTOM_TYPE, persisted);
     writeRalplanStateFile(sessionCwd, state);
   }
-
-  function deactivateState(notifyCtx?: ExtensionContext): void {
+  // T-9.2 + T-9.3: honor autoCleanup flag and accept suppressCleanup option.
+  //   - autoCleanup (from worktree.ts:DEFAULT_AUTO_CLEANUP, default false):
+  //     when true, the worktree is removed on completion. When false, the
+  //     worktree (and its spec/plan/answers) is preserved for review.
+  //   - suppressCleanup: explicit override for the cancel path so a user
+  //     cancellation always preserves the worktree regardless of autoCleanup.
+  function deactivateState(
+    notifyCtx?: ExtensionContext,
+    opts?: { suppressCleanup?: boolean },
+  ): void {
     if (state) {
+      const shouldCleanup =
+        !opts?.suppressCleanup && getAutoCleanup() && !!state.worktreePath;
       // Best-effort worktree cleanup — warn but don't block deactivation
-      if (state.worktreePath) {
+      if (shouldCleanup && state.worktreePath) {
         try {
           const result = cleanupWorktree(state.worktreePath);
           if (!result.success) {
@@ -229,6 +240,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     state = null;
     clearRalplanStateFile(sessionCwd);
   }
+
 
   function updateUI(ctx: ExtensionContext): void {
     if (!isActive() || !state) {
@@ -500,8 +512,9 @@ ${prompt}`,
         "This will discard the current pipeline.",
       );
       if (!ok) return;
+      // T-9.3: cancel path always preserves the worktree so users can review artifacts.
+      deactivateState(ctx, { suppressCleanup: true });
 
-      deactivateState(ctx);
       updateUI(ctx);
       ctx.ui.notify("RALPLAN cancelled.", "info");
     },

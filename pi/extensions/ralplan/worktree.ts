@@ -10,8 +10,25 @@ import { resolveWorktreeRoot } from "./utils.js";
 
 // Default worktree settings
 export const DEFAULT_BASE_BRANCH = "main";
-export const DEFAULT_CREATE_BRANCH = true;
 export const DEFAULT_AUTO_CLEANUP = false;
+
+// T-9.1: module-level autoCleanup flag, mutable via setAutoCleanup for
+// tests. The default (false) preserves user artifacts (spec/plan/answers)
+// in the worktree after pipeline completion. Set to true to opt into
+// automatic cleanup. (Production code should leave it at the default;
+// a v3 round may introduce proper per-session config.)
+let _autoCleanup = DEFAULT_AUTO_CLEANUP;
+
+/** Set the runtime autoCleanup flag. Used by tests; production should leave at the default. */
+export function setAutoCleanup(value: boolean): void {
+  _autoCleanup = value;
+}
+
+/** Get the current autoCleanup flag. Read by `deactivateState` to decide whether to clean up. */
+export function getAutoCleanup(): boolean {
+  return _autoCleanup;
+}
+
 
 export interface WorktreeConfig {
   baseBranch: string;
