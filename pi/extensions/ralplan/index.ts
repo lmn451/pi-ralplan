@@ -289,10 +289,13 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
 
     // Find the most recent ralplan-state entry, validated by type guard
     // (T-7). Malformed entries fall through to the file-based fallback below.
+    // The `as` is needed because SessionEntry is a discriminated union and
+    // TypeScript can't narrow on string-literal filters alone in all cases.
     const ralplanEntry = entries
       .filter((e) => e.type === "custom" && e.customType === CUSTOM_TYPE)
-      .pop();
+      .pop() as { data?: PersistedState } | undefined;
     const data = ralplanEntry?.data;
+
     if (isPersistedState(data)) {
 
       const status = getPipelineStatus(data.tracking);
