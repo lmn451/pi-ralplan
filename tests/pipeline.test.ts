@@ -14,7 +14,9 @@ import {
   getActiveAdapters,
   registerAdapters,
   syncTrackingToConfig,
+  getStageMaxIterations,
   DEFAULT_PIPELINE_CONFIG,
+
   type PipelineConfig,
   type PipelineTracking,
   type PipelineContext,
@@ -427,3 +429,36 @@ describe("syncTrackingToConfig", () => {
     expect(tracking.stages[0].status).toBe("complete");
   });
 });
+
+// T-8: per-stage maxIterations helper
+describe("getStageMaxIterations (T-8)", () => {
+  it("returns 5 for the QA stage regardless of config", () => {
+    const config: PipelineConfig = {
+      ...DEFAULT_PIPELINE_CONFIG,
+      verification: { engine: "ralph", maxIterations: 100 },
+    };
+    expect(getStageMaxIterations("qa", config)).toBe(5);
+  });
+
+  it("returns config.verification.maxIterations for the ralph (verification) stage", () => {
+    const config: PipelineConfig = {
+      ...DEFAULT_PIPELINE_CONFIG,
+      verification: { engine: "ralph", maxIterations: 42 },
+    };
+    expect(getStageMaxIterations("ralph", config)).toBe(42);
+  });
+
+  it("falls back to 100 for ralph when verification is disabled", () => {
+    const config: PipelineConfig = {
+      ...DEFAULT_PIPELINE_CONFIG,
+      verification: false,
+    };
+    expect(getStageMaxIterations("ralph", config)).toBe(100);
+  });
+
+  it("returns 100 for planning and execution stages", () => {
+    expect(getStageMaxIterations("ralplan", DEFAULT_PIPELINE_CONFIG)).toBe(100);
+    expect(getStageMaxIterations("execution", DEFAULT_PIPELINE_CONFIG)).toBe(100);
+  });
+});
+

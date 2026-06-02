@@ -17,9 +17,11 @@ import {
   getPipelineStatus,
   formatPipelineHUD,
   syncTrackingToConfig,
+  getStageMaxIterations,
   type PipelineTracking,
   type PipelineContext,
 } from "./pipeline.js";
+
 
 import {
   ralplanAdapter,
@@ -1230,14 +1232,14 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
   pi.on("turn_end", async (_event, ctx) => {
     if (!isActive() || !state) return;
 
-    // Check if max iterations reached before incrementing
+    // T-8: per-stage maxIterations. QA = 5; verification = configured
+    // (default 100); planning/execution = DEFAULT_STAGE_MAX_ITERATIONS.
     const currentStage =
       state.pipeline.stages[state.pipeline.currentStageIndex];
-    const maxIters =
-      state.pipeline.pipelineConfig.verification &&
-      typeof state.pipeline.pipelineConfig.verification === "object"
-        ? (state.pipeline.pipelineConfig.verification.maxIterations ?? 100)
-        : 100;
+    const maxIters = getStageMaxIterations(
+      currentStage.id,
+      state.pipeline.pipelineConfig,
+    );
     if (currentStage.iterations >= maxIters) {
       ctx.ui.notify(
         `Maximum iterations (${maxIters}) reached for ${currentStage.id}. Please review and manually approve or use /ralplan:skip to proceed.`,
@@ -1245,6 +1247,7 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
       );
       return; // Don't increment or process signals — escalate to user
     }
+
 
     state.pipeline = incrementStageIteration(state.pipeline);
     persistState();
