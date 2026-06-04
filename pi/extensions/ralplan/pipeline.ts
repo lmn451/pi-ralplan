@@ -44,7 +44,17 @@ export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {
 
 export interface PipelineContext {
   idea: string;
+  /**
+   * Original repository directory — where `git worktree` was run from.
+   * Used by path-derivation helpers (e.g. `resolveWorktreeRoot`).
+   * MUST NOT be the worktree path; use `cwd` or `worktreePath` for that.
+   */
   directory: string;
+  /**
+   * Actual working directory for the agent. Equals `worktreePath` when a
+   * worktree exists, else falls back to `directory`. Use this to set the
+   * agent's `cwd`.
+   */
   cwd: string; // Explicit working directory — set to worktreePath when available, else sessionCwd
   sessionId?: string;
   specPath?: string;

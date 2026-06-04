@@ -29,6 +29,7 @@ export interface RalplanState {
   startedAt: string;
   completedAt?: string;
   worktreePath?: string; // Associated worktree for this plan
+  sessionCwd?: string; // Original directory where the session started (for worktree path derivation)
 }
 
 const CURRENT_VERSION = 3;
@@ -55,6 +56,7 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
     }
     // v2 → v3 migration: worktreePath field was added in v3
     // v2 sessions didn't have worktree support, so undefined is correct
+    // Note: sessionCwd is also a v3+ field; older sessions fall back to process.cwd()
     if (parsed.version === 2) {
       parsed.version = 3;
     }
@@ -112,7 +114,7 @@ export function buildDefaultState(
   pipeline: PipelineTracking,
   sessionId?: string,
   mode: RalplanMode = "ralplan",
-  directory?: string,
+  sessionCwd?: string,
 ): RalplanState {
   const state: RalplanState = {
     version: CURRENT_VERSION,
@@ -125,12 +127,13 @@ export function buildDefaultState(
     sessionId,
     startedAt: new Date().toISOString(),
     worktreePath: undefined, // Set after worktree creation
+    sessionCwd, // Original directory (for worktree path derivation)
   };
 
   if (mode === "brainstorm") {
     state.brainstorm = createBrainstormState();
-    state.answersPath = directory
-      ? resolveAnswersPath(directory)
+    state.answersPath = sessionCwd
+      ? resolveAnswersPath(sessionCwd)
       : "plans/answers.md";
   }
 

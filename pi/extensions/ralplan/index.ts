@@ -97,9 +97,46 @@ interface PersistedState {
   answersPath?: string;
   brainstorm?: BrainstormState;
   worktreePath?: string; // NEW: Associated worktree
+  sessionCwd?: string; // NEW: Original directory at session start
 }
-
 const CUSTOM_TYPE = "ralplan-state";
+
+/**
+ * Pure function: build a PipelineContext from state + paths.
+ * Exported for testability — the closure inside the extension delegates to this.
+ *
+ * CRITICAL: `sessionCwd` MUST be the ORIGINAL directory (where `git worktree`
+ * was run from), NOT the worktree path. `resolveWorktreeRoot` and similar
+ * path-derivation helpers assume `context.directory` is the original repo.
+ * Use `worktreePath` (the 3rd arg) for `context.cwd` and `context.worktreePath`.
+ */
+export function buildPipelineContext(
+  state: RalplanState,
+  sessionCwd: string,
+  worktreePath: string | undefined,
+): PipelineContext {
+  const toWorkspacePath = (p?: string): string | undefined => {
+    if (!p || !worktreePath) return p;
+    return join(worktreePath, p);
+  };
+
+  return {
+    idea: state.originalIdea,
+    directory: sessionCwd,
+    cwd: worktreePath ?? sessionCwd,
+    sessionId: state.sessionId,
+    specPath: toWorkspacePath(state.specPath),
+    planPath: toWorkspacePath(state.planPath),
+    openQuestionsPath: worktreePath
+      ? resolveOpenQuestionsPath(worktreePath)
+      : "plans/open-questions.md",
+    answersPath: toWorkspacePath(state.answersPath),
+    config: state.pipeline.pipelineConfig,
+    mode: state.mode,
+    brainstorm: state.brainstorm,
+    worktreePath,
+  };
+}
 
 // ============================================================================
 // EXTENSION ENTRY POINT
@@ -135,29 +172,18 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     return join(state.worktreePath, path);
   }
 
-  // NOTE: worktreePath is included so executionAdapter.onEnter() can detect
-  // if a worktree was already created. The guard "if (context.worktreePath) return;"
-  // in onEnter prevents redundant creation.
+  // NOTE: `buildPipelineContext` is the PURE exported equivalent of this closure.
+  // The closure delegates to it, passing `state.sessionCwd` (original directory)
+  // for `context.directory` — NOT the worktree path. This fixes the kickoff
+  // message's doubled `-worktrees` suffix bug.
   function buildContext(): PipelineContext | null {
     if (!state) return null;
-    return {
-      idea: state.originalIdea,
-      directory: getWorkspaceDir(),
-      cwd: getWorkspaceDir(), // Explicit cwd — set to worktreePath when available
-      sessionId: state.sessionId,
-      specPath: toWorkspacePath(state.specPath),
-      planPath: toWorkspacePath(state.planPath),
-      openQuestionsPath: state.worktreePath
-        ? resolveOpenQuestionsPath(state.worktreePath)
-        : "plans/open-questions.md",
-      answersPath: toWorkspacePath(state.answersPath),
-      config: state.pipeline.pipelineConfig,
-      mode: state.mode,
-      brainstorm: state.brainstorm,
-      worktreePath: state.worktreePath,
-    };
+    return buildPipelineContext(
+      state,
+      state.sessionCwd ?? sessionCwd,
+      state.worktreePath,
+    );
   }
-
   function persistState(): void {
     if (!state) return;
     const persisted: PersistedState = {
@@ -171,6 +197,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       answersPath: state.answersPath,
       brainstorm: state.brainstorm,
       worktreePath: state.worktreePath,
+      sessionCwd: state.sessionCwd,
     };
     pi.appendEntry(CUSTOM_TYPE, persisted);
     writeRalplanStateFile(sessionCwd, state);
@@ -264,6 +291,7 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         brainstorm: data.brainstorm,
         sessionId: data.sessionId,
         worktreePath: data.worktreePath,
+        sessionCwd: data.sessionCwd,
         startedAt:
           data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
       };
