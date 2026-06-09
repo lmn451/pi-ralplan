@@ -1,0 +1,285 @@
+From 5ead9a0daf1f506a4af5340b44bf72c129548386 Mon Sep 17 00:00:00 2001
+From: Michael Lerman <mlerman@ironscales.com>
+Date: Tue, 9 Jun 2026 14:24:19 +0300
+Subject: [PATCH 5/6] ci: enforce typecheck and formatting
+
+Add 'tsc --noEmit' and 'prettier --check' steps to CI so type and format
+regressions fail the build (husky only covers staged files locally).
+Reformats pre-existing files to satisfy the new prettier gate.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+---
+ .github/workflows/ci.yml            |  2 +
+ pi/extensions/ralplan/brainstorm.ts | 35 +++++++++++----
+ tests/brainstorm.test.ts            | 66 +++++++++++++++++++++++------
+ tests/naming.test.ts                |  2 +-
+ 4 files changed, 82 insertions(+), 23 deletions(-)
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d3b5691..62be0fd 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -19,4 +19,6 @@ jobs:
+           node-version: 24
+           cache: npm
+       - run: npm ci
++      - run: npx tsc --noEmit
++      - run: npx prettier --check "pi/**/*.ts" "tests/**/*.ts"
+       - run: npm test
+diff --git a/pi/extensions/ralplan/brainstorm.ts b/pi/extensions/ralplan/brainstorm.ts
+index fd4574b..53b12b2 100644
+--- a/pi/extensions/ralplan/brainstorm.ts
++++ b/pi/extensions/ralplan/brainstorm.ts
+@@ -41,7 +41,8 @@ export function transitionSubPhase(
+   return {
+     ...state,
+     subPhase: target,
+-    awaitingSince: target === "awaiting-answers" ? new Date().toISOString() : undefined,
++    awaitingSince:
++      target === "awaiting-answers" ? new Date().toISOString() : undefined,
+   };
+ }
+ 
+@@ -56,7 +57,10 @@ export function appendAnswer(
+   };
+ }
+ 
+-export function withQuestions(state: BrainstormState, questions: string[]): BrainstormState {
++export function withQuestions(
++  state: BrainstormState,
++  questions: string[],
++): BrainstormState {
+   return {
+     ...state,
+     questions,
+@@ -94,7 +98,10 @@ export function sanitizeForPrompt(text: string): string {
+     .replace(/PIPELINE_EXECUTION_COMPLETE/g, "PIPELINE\\_EXECUTION\\_COMPLETE")
+     .replace(/PIPELINE_RALPH_COMPLETE/g, "PIPELINE\\_RALPH\\_COMPLETE")
+     .replace(/PIPELINE_QA_COMPLETE/g, "PIPELINE\\_QA\\_COMPLETE")
+-    .replace(/BRAINSTORM_OPEN_QUESTIONS_READY/g, "BRAINSTORM\\_OPEN\\_QUESTIONS\\_READY");
++    .replace(
++      /BRAINSTORM_OPEN_QUESTIONS_READY/g,
++      "BRAINSTORM\\_OPEN\\_QUESTIONS\\_READY",
++    );
+ }
+ 
+ /** Format Q+A pairs as markdown for prompt injection */
+@@ -125,9 +132,11 @@ export function parseOpenQuestions(markdown: string): string[] {
+       .slice(headingMatch.index + headingMatch[0].length)
+       .replace(/^\r?\n/, "");
+     const nextHeadingIndex = afterHeading.search(/\r?\n##\s+/);
+-    const section = (nextHeadingIndex >= 0
+-      ? afterHeading.slice(0, nextHeadingIndex)
+-      : afterHeading).trim();
++    const section = (
++      nextHeadingIndex >= 0
++        ? afterHeading.slice(0, nextHeadingIndex)
++        : afterHeading
++    ).trim();
+     if (!section) return [];
+ 
+     return section
+@@ -169,7 +178,8 @@ export function skipQuestions(state: BrainstormState): BrainstormState {
+       ...state.answers,
+       {
+         question: "[SKIP]",
+-        answer: "User skipped open questions. Proceeding with best-effort planning.",
++        answer:
++          "User skipped open questions. Proceeding with best-effort planning.",
+       },
+     ],
+   };
+@@ -185,7 +195,11 @@ export function doneAnswering(state: BrainstormState): BrainstormState {
+ // ============================================================================
+ 
+ export interface BrainstormAgentEndResult {
+-  action: "suppress" | "transition-to-awaiting" | "transition-to-planning" | "advance";
++  action:
++    | "suppress"
++    | "transition-to-awaiting"
++    | "transition-to-planning"
++    | "advance";
+   questions?: string[];
+   error?: string;
+ }
+@@ -212,7 +226,10 @@ export function processBrainstormAgentEnd(
+         questions = parseOpenQuestions(openQuestionsContent);
+       }
+       if (questions.length === 0) {
+-        return { action: "transition-to-planning", error: "No open questions found. Proceeding directly to planning." };
++        return {
++          action: "transition-to-planning",
++          error: "No open questions found. Proceeding directly to planning.",
++        };
+       }
+       return { action: "transition-to-awaiting", questions };
+     }
+diff --git a/tests/brainstorm.test.ts b/tests/brainstorm.test.ts
+index db5f8d8..cd31116 100644
+--- a/tests/brainstorm.test.ts
++++ b/tests/brainstorm.test.ts
+@@ -23,7 +23,10 @@ import {
+   BRAINSTORM_OPEN_QUESTIONS_READY,
+ } from "../pi/extensions/ralplan/signals.js";
+ import type { RalplanState } from "../pi/extensions/ralplan/state.js";
+-import { buildPipelineTracking, DEFAULT_PIPELINE_CONFIG } from "../pi/extensions/ralplan/pipeline.js";
++import {
++  buildPipelineTracking,
++  DEFAULT_PIPELINE_CONFIG,
++} from "../pi/extensions/ralplan/pipeline.js";
+ 
+ describe("createBrainstormState", () => {
+   it("returns correct default state", () => {
+@@ -56,7 +59,10 @@ describe("appendAnswer", () => {
+     const state = createBrainstormState();
+     const result = appendAnswer(state, "What architecture?", "Microservices");
+     expect(result.answers).toHaveLength(1);
+-    expect(result.answers[0]).toEqual({ question: "What architecture?", answer: "Microservices" });
++    expect(result.answers[0]).toEqual({
++      question: "What architecture?",
++      answer: "Microservices",
++    });
+   });
+ 
+   it("returns new object (immutability)", () => {
+@@ -93,7 +99,10 @@ describe("formatAnswersForPrompt", () => {
+ 
+ describe("isAwaitingAnswers", () => {
+   it("returns true for awaiting-answers", () => {
+-    const state = transitionSubPhase(createBrainstormState(), "awaiting-answers");
++    const state = transitionSubPhase(
++      createBrainstormState(),
++      "awaiting-answers",
++    );
+     expect(isAwaitingAnswers(state)).toBe(true);
+   });
+ 
+@@ -117,7 +126,10 @@ describe("shouldSuppressSignals", () => {
+     };
+     expect(shouldSuppressSignals(ralplanState)).toBe(true); // expanding
+ 
+-    ralplanState.brainstorm = transitionSubPhase(ralplanState.brainstorm!, "awaiting-answers");
++    ralplanState.brainstorm = transitionSubPhase(
++      ralplanState.brainstorm!,
++      "awaiting-answers",
++    );
+     expect(shouldSuppressSignals(ralplanState)).toBe(true); // awaiting-answers
+   });
+ 
+@@ -211,7 +223,10 @@ describe("skipQuestions", () => {
+   });
+ 
+   it("transitions from awaiting-answers to planning", () => {
+-    const state = transitionSubPhase(createBrainstormState(), "awaiting-answers");
++    const state = transitionSubPhase(
++      createBrainstormState(),
++      "awaiting-answers",
++    );
+     const result = skipQuestions(state);
+     expect(result.subPhase).toBe("planning");
+     expect(result.answers).toHaveLength(1);
+@@ -220,7 +235,10 @@ describe("skipQuestions", () => {
+ 
+ describe("doneAnswering", () => {
+   it("transitions from awaiting-answers to planning", () => {
+-    const state = transitionSubPhase(createBrainstormState(), "awaiting-answers");
++    const state = transitionSubPhase(
++      createBrainstormState(),
++      "awaiting-answers",
++    );
+     const result = doneAnswering(state);
+     expect(result.subPhase).toBe("planning");
+   });
+@@ -228,11 +246,21 @@ describe("doneAnswering", () => {
+ 
+ describe("detectBrainstormSignal", () => {
+   it("detects OPEN_QUESTIONS_READY signal", () => {
+-    expect(detectBrainstormSignal("Some text BRAINSTORM_OPEN_QUESTIONS_READY more text", BRAINSTORM_OPEN_QUESTIONS_READY)).toBe(true);
++    expect(
++      detectBrainstormSignal(
++        "Some text BRAINSTORM_OPEN_QUESTIONS_READY more text",
++        BRAINSTORM_OPEN_QUESTIONS_READY,
++      ),
++    ).toBe(true);
+   });
+ 
+   it("returns false for absent signal", () => {
+-    expect(detectBrainstormSignal("Some text without the signal", BRAINSTORM_OPEN_QUESTIONS_READY)).toBe(false);
++    expect(
++      detectBrainstormSignal(
++        "Some text without the signal",
++        BRAINSTORM_OPEN_QUESTIONS_READY,
++      ),
++    ).toBe(false);
+   });
+ });
+ describe("sanitizeForPrompt", () => {
+@@ -275,13 +303,25 @@ describe("processBrainstormAgentEnd", () => {
+ 
+   it("suppresses signals in expanding sub-phase", () => {
+     const state = makeState("expanding");
+-    const result = processBrainstormAgentEnd(state, "some text", null, noOpDetectBrainstorm, noOpDetectSignal);
++    const result = processBrainstormAgentEnd(
++      state,
++      "some text",
++      null,
++      noOpDetectBrainstorm,
++      noOpDetectSignal,
++    );
+     expect(result.action).toBe("suppress");
+   });
+ 
+   it("suppresses signals in awaiting-answers sub-phase", () => {
+     const state = makeState("awaiting-answers");
+-    const result = processBrainstormAgentEnd(state, "some text", null, noOpDetectBrainstorm, noOpDetectSignal);
++    const result = processBrainstormAgentEnd(
++      state,
++      "some text",
++      null,
++      noOpDetectBrainstorm,
++      noOpDetectSignal,
++    );
+     expect(result.action).toBe("suppress");
+   });
+ 
+@@ -305,7 +345,7 @@ describe("processBrainstormAgentEnd", () => {
+     const result = processBrainstormAgentEnd(
+       state,
+       "done BRAINSTORM_OPEN_QUESTIONS_READY",
+-      "",  // empty questions content
++      "", // empty questions content
+       detectBrainstorm,
+       noOpDetectSignal,
+     );
+@@ -315,7 +355,7 @@ describe("processBrainstormAgentEnd", () => {
+ 
+   it("allows PIPELINE_RALPLAN_COMPLETE in planning sub-phase", () => {
+     const state = makeState("planning");
+-    const detectSignal = (_t: string, _s: string) => true;  // simulate detection
++    const detectSignal = (_t: string, _s: string) => true; // simulate detection
+     const result = processBrainstormAgentEnd(
+       state,
+       "done PIPELINE_RALPLAN_COMPLETE",
+@@ -328,7 +368,7 @@ describe("processBrainstormAgentEnd", () => {
+ 
+   it("suppresses PIPELINE_RALPLAN_COMPLETE in expanding", () => {
+     const state = makeState("expanding");
+-    const detectSignal = (_t: string, _s: string) => true;  // simulate detection
++    const detectSignal = (_t: string, _s: string) => true; // simulate detection
+     const result = processBrainstormAgentEnd(
+       state,
+       "done PIPELINE_RALPLAN_COMPLETE",
+diff --git a/tests/naming.test.ts b/tests/naming.test.ts
+index f5900cb..27ed74a 100644
+--- a/tests/naming.test.ts
++++ b/tests/naming.test.ts
+@@ -120,4 +120,4 @@ describe("naming.ts", () => {
+       expect(result).toBe("plan-2026-05-05-2");
+     });
+   });
+-});
+\ No newline at end of file
++});
+-- 
+2.54.0
+
