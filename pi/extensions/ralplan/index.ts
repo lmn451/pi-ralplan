@@ -19,6 +19,7 @@ import {
   syncTrackingToConfig,
   type PipelineTracking,
   type PipelineContext,
+  type PipelineStageId,
 } from "./pipeline.js";
 
 import {
@@ -41,7 +42,6 @@ import {
   detectSignal,
   detectBrainstormSignal,
   getLastAssistantText,
-  BRAINSTORM_OPEN_QUESTIONS_READY,
 } from "./signals.js";
 
 import {
@@ -64,14 +64,11 @@ import { resolveOpenQuestionsPath } from "./utils.js";
 import { createWorktreeForRalplan, cleanupWorktree } from "./worktree.js";
 
 import {
-  createBrainstormState,
   transitionSubPhase,
   appendAnswer,
   withQuestions,
-  shouldSuppressSignals,
   isBrainstormMode,
   isAwaitingAnswers,
-  parseOpenQuestions,
   skipQuestions,
   doneAnswering,
   processBrainstormAgentEnd,
@@ -307,6 +304,88 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     }
   }
 
+  /**
+   * Shared session bootstrap for /ralplan, /brainstorm, and --ralplan/--brainstorm
+   * auto-start. Builds config + tracking, activates the first stage, creates the
+   * worktree, and persists fresh state. Returns the tracking for callers that need
+   * to dispatch a start message.
+   */
+  function startPipelineSession(
+    idea: string,
+    mode: RalplanMode,
+    ctx: ExtensionContext,
+    options: { notifyWorktreeFailure?: boolean } = {},
+  ): PipelineTracking {
+    const config = resolvePipelineConfig();
+    const tracking = buildPipelineTracking(config);
+
+    if (
+      tracking.currentStageIndex >= 0 &&
+      tracking.currentStageIndex < tracking.stages.length
+    ) {
+      tracking.stages[tracking.currentStageIndex].status = "active";
+      tracking.stages[tracking.currentStageIndex].startedAt =
+        new Date().toISOString();
+    }
+
+    // Create worktree (guards against double-creation in executionAdapter.onEnter)
+    const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
+    if (worktreeResult.success && worktreeResult.path) {
+      console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+    } else {
+      console.warn(
+        `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+      );
+      if (options.notifyWorktreeFailure) {
+        ctx.ui.notify(
+          `Worktree creation failed: ${worktreeResult.error}`,
+          "warning",
+        );
+      }
+    }
+
+    state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
+    state.worktreePath = worktreeResult.success
+      ? worktreeResult.path
+      : undefined;
+    persistState();
+    updateUI(ctx);
+
+    return tracking;
+  }
+
+  /** Dispatch the initial stage prompt as a steering message (used by commands). */
+  function sendStartMessage(
+    idea: string,
+    tracking: PipelineTracking,
+    mode: RalplanMode,
+  ): void {
+    const context = buildContext();
+    if (!context) return;
+    const adapter = getCurrentStageAdapter(tracking);
+    if (!adapter) return;
+
+    const label = mode === "brainstorm" ? "BRAINSTORM" : "RALPLAN";
+    const prompt = adapter.getPrompt(context);
+    pi.sendMessage(
+      {
+        customType:
+          mode === "brainstorm" ? "brainstorm-start" : "ralplan-start",
+        content: `## ${label} Pipeline Started
+
+Idea: ${idea}
+Stages: ${tracking.stages
+          .filter((s) => s.status !== "skipped")
+          .map((s) => s.id)
+          .join(" → ")}
+
+${prompt}`,
+        display: true,
+      },
+      { triggerTurn: true, deliverAs: "steer" },
+    );
+  }
+
   // ==========================================================================
   // COMMANDS
   // ==========================================================================
@@ -336,66 +415,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       }
 
       const idea = args.trim() || "Implement the requested feature";
-      const config = resolvePipelineConfig();
-      const tracking = buildPipelineTracking(config);
-
-      if (
-        tracking.currentStageIndex >= 0 &&
-        tracking.currentStageIndex < tracking.stages.length
-      ) {
-        tracking.stages[tracking.currentStageIndex].status = "active";
-        tracking.stages[tracking.currentStageIndex].startedAt =
-          new Date().toISOString();
-      }
-
-      // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-      if (worktreeResult.success && worktreeResult.path) {
-        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
-      } else {
-        console.warn(
-          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
-        );
-      }
-
-      state = buildDefaultState(
-        idea,
-        tracking,
-        undefined,
-        "ralplan",
-        sessionCwd,
-      );
-      state.worktreePath = worktreeResult.success
-        ? worktreeResult.path
-        : undefined;
-      persistState();
-      updateUI(ctx);
-
+      const tracking = startPipelineSession(idea, "ralplan", ctx);
       ctx.ui.notify(`RALPLAN started: ${idea}`, "info");
-
-      const context = buildContext();
-      if (context) {
-        const adapter = getCurrentStageAdapter(tracking);
-        if (adapter) {
-          const prompt = adapter.getPrompt(context);
-          pi.sendMessage(
-            {
-              customType: "ralplan-start",
-              content: `## RALPLAN Pipeline Started
-
-Idea: ${idea}
-Stages: ${tracking.stages
-                .filter((s) => s.status !== "skipped")
-                .map((s) => s.id)
-                .join(" → ")}
-
-${prompt}`,
-              display: true,
-            },
-            { triggerTurn: true, deliverAs: "steer" },
-          );
-        }
-      }
+      sendStartMessage(idea, tracking, "ralplan");
     },
   });
 
@@ -412,65 +434,9 @@ ${prompt}`,
       }
 
       const idea = args.trim() || "Implement the requested feature";
-      const config = resolvePipelineConfig();
-      const tracking = buildPipelineTracking(config);
-
-      if (
-        tracking.currentStageIndex >= 0 &&
-        tracking.currentStageIndex < tracking.stages.length
-      ) {
-        tracking.stages[tracking.currentStageIndex].status = "active";
-        tracking.stages[tracking.currentStageIndex].startedAt =
-          new Date().toISOString();
-      }
-      // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-      if (worktreeResult.success) {
-        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
-      } else {
-        console.warn(
-          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
-        );
-      }
-
-      state = buildDefaultState(
-        idea,
-        tracking,
-        undefined,
-        "brainstorm",
-        sessionCwd,
-      );
-      state.worktreePath = worktreeResult.success
-        ? worktreeResult.path
-        : undefined;
-      persistState();
-      updateUI(ctx);
-
+      const tracking = startPipelineSession(idea, "brainstorm", ctx);
       ctx.ui.notify(`BRAINSTORM started: ${idea}`, "info");
-
-      const context = buildContext();
-      if (context) {
-        const adapter = getCurrentStageAdapter(tracking);
-        if (adapter) {
-          const prompt = adapter.getPrompt(context);
-          pi.sendMessage(
-            {
-              customType: "brainstorm-start",
-              content: `## BRAINSTORM Pipeline Started
-
-Idea: ${idea}
-Stages: ${tracking.stages
-                .filter((s) => s.status !== "skipped")
-                .map((s) => s.id)
-                .join(" → ")}
-
-${prompt}`,
-              display: true,
-            },
-            { triggerTurn: true, deliverAs: "steer" },
-          );
-        }
-      }
+      sendStartMessage(idea, tracking, "brainstorm");
     },
   });
 
@@ -960,38 +926,7 @@ ${prompt}`,
       autoStartMode = null; // Prevent any other event from entering
 
       const idea = event.prompt.trim() || "Implement the requested feature";
-      const config = resolvePipelineConfig();
-      const tracking = buildPipelineTracking(config);
-
-      if (
-        tracking.currentStageIndex >= 0 &&
-        tracking.currentStageIndex < tracking.stages.length
-      ) {
-        tracking.stages[tracking.currentStageIndex].status = "active";
-        tracking.stages[tracking.currentStageIndex].startedAt =
-          new Date().toISOString();
-      }
-
-      // Create worktree (guards against double-creation in executionAdapter.onEnter)
-      const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-      if (worktreeResult.success) {
-        console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
-      } else {
-        console.warn(
-          `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
-        );
-        ctx.ui.notify(
-          `Worktree creation failed: ${worktreeResult.error}`,
-          "warning",
-        );
-      }
-
-      state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
-      state.worktreePath = worktreeResult.success
-        ? worktreeResult.path
-        : undefined;
-      persistState();
-      updateUI(ctx);
+      startPipelineSession(idea, mode, ctx, { notifyWorktreeFailure: true });
 
       const label = mode === "brainstorm" ? "BRAINSTORM" : "RALPLAN";
       ctx.ui.notify(`${label} started (via --${mode}): ${idea}`, "info");
@@ -1054,95 +989,79 @@ ${prompt}`,
     if (!lastText) return;
 
     // === BRAINSTORM SIGNAL ROUTING ===
+    // Delegate routing decisions to the pure (unit-tested) helper so the
+    // production path and the tests share a single source of truth.
     if (state.mode === "brainstorm" && currentStage.id === "ralplan") {
-      // Use shouldSuppressSignals for consistent signal suppression
-      if (shouldSuppressSignals(state)) {
-        const sub = state.brainstorm?.subPhase;
-
-        // expanding sub-phase: check for OPEN_QUESTIONS_READY
-        if (sub === "expanding") {
-          if (
-            detectBrainstormSignal(lastText, BRAINSTORM_OPEN_QUESTIONS_READY)
-          ) {
-            // Parse questions from open-questions.md
-            const questionsPath = resolveOpenQuestionsPath(getWorkspaceDir());
-            let questions: string[] = [];
-            try {
-              const content = readFileSync(questionsPath, "utf-8");
-              questions = parseOpenQuestions(content);
-            } catch {
-              ctx.ui.notify(
-                "Warning: Could not read open questions file. Proceeding with empty list.",
-                "warning",
-              );
-            }
-
-            // Handle empty questions: auto-transition to planning
-            if (questions.length === 0) {
-              ctx.ui.notify(
-                "No open questions found. Proceeding directly to planning.",
-                "warning",
-              );
-              state.brainstorm = transitionSubPhase(
-                state.brainstorm!,
-                "planning",
-              );
-              persistState();
-              updateUI(ctx);
-
-              const context = buildContext();
-              if (context) {
-                pi.sendMessage(
-                  {
-                    customType: "brainstorm-auto-plan",
-                    content: getBrainstormResumePrompt(context),
-                    display: true,
-                  },
-                  { triggerTurn: true, deliverAs: "steer" },
-                );
-              }
-              return;
-            }
-
-            // Transition to awaiting-answers
-            state.brainstorm = withQuestions(
-              transitionSubPhase(state.brainstorm!, "awaiting-answers"),
-              questions,
-            );
-            persistState();
-            updateUI(ctx);
-
-            // Send awaiting prompt to user
-            // Defer via setTimeout to escape agent_end phase where isStreaming
-            // is still true — without this the message goes to the dead followUpQueue
-            // and only appears on the NEXT user prompt.
-            setTimeout(() => {
-              pi.sendMessage(
-                {
-                  customType: "brainstorm-awaiting",
-                  content: getBrainstormAwaitingPrompt(questions),
-                  display: true,
-                },
-                { triggerTurn: false },
-              );
-            }, 0);
-            return;
-          }
-          // Other signals suppressed during expanding
-          return;
-        }
-
-        // awaiting-answers: total signal suppression
-        return;
+      let openQuestionsContent: string | null = null;
+      try {
+        openQuestionsContent = readFileSync(
+          resolveOpenQuestionsPath(getWorkspaceDir()),
+          "utf-8",
+        );
+      } catch {
+        openQuestionsContent = null;
       }
 
-      // planning sub-phase: allow normal PIPELINE_RALPLAN_COMPLETE detection
-      if (state.brainstorm?.subPhase === "planning") {
-        if (detectSignal(lastText, currentStage.id)) {
-          // Fall through to existing advancement logic below
-        } else {
+      const decision = processBrainstormAgentEnd(
+        state,
+        lastText,
+        openQuestionsContent,
+        detectBrainstormSignal,
+        (text, stageId) => detectSignal(text, stageId as PipelineStageId),
+      );
+
+      switch (decision.action) {
+        case "suppress":
+          return;
+
+        case "transition-to-awaiting": {
+          const questions = decision.questions ?? [];
+          state.brainstorm = withQuestions(
+            transitionSubPhase(state.brainstorm!, "awaiting-answers"),
+            questions,
+          );
+          persistState();
+          updateUI(ctx);
+
+          // Defer via setTimeout to escape agent_end phase where isStreaming
+          // is still true — without this the message goes to the dead followUpQueue
+          // and only appears on the NEXT user prompt.
+          setTimeout(() => {
+            pi.sendMessage(
+              {
+                customType: "brainstorm-awaiting",
+                content: getBrainstormAwaitingPrompt(questions),
+                display: true,
+              },
+              { triggerTurn: false },
+            );
+          }, 0);
           return;
         }
+
+        case "transition-to-planning": {
+          if (decision.error) ctx.ui.notify(decision.error, "warning");
+          state.brainstorm = transitionSubPhase(state.brainstorm!, "planning");
+          persistState();
+          updateUI(ctx);
+
+          const context = buildContext();
+          if (context) {
+            pi.sendMessage(
+              {
+                customType: "brainstorm-auto-plan",
+                content: getBrainstormResumePrompt(context),
+                display: true,
+              },
+              { triggerTurn: true, deliverAs: "steer" },
+            );
+          }
+          return;
+        }
+
+        case "advance":
+          // Fall through to the shared advancement logic below.
+          break;
       }
     }
 
