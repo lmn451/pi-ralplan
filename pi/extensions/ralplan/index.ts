@@ -1,9 +1,8 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-coding-agent";
+import { Type, StringEnum } from "@earendil-works/pi-ai";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
