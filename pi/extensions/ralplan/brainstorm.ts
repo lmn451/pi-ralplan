@@ -41,7 +41,8 @@ export function transitionSubPhase(
   return {
     ...state,
     subPhase: target,
-    awaitingSince: target === "awaiting-answers" ? new Date().toISOString() : undefined,
+    awaitingSince:
+      target === "awaiting-answers" ? new Date().toISOString() : undefined,
   };
 }
 
@@ -56,7 +57,10 @@ export function appendAnswer(
   };
 }
 
-export function withQuestions(state: BrainstormState, questions: string[]): BrainstormState {
+export function withQuestions(
+  state: BrainstormState,
+  questions: string[],
+): BrainstormState {
   return {
     ...state,
     questions,
@@ -94,7 +98,10 @@ export function sanitizeForPrompt(text: string): string {
     .replace(/PIPELINE_EXECUTION_COMPLETE/g, "PIPELINE\\_EXECUTION\\_COMPLETE")
     .replace(/PIPELINE_RALPH_COMPLETE/g, "PIPELINE\\_RALPH\\_COMPLETE")
     .replace(/PIPELINE_QA_COMPLETE/g, "PIPELINE\\_QA\\_COMPLETE")
-    .replace(/BRAINSTORM_OPEN_QUESTIONS_READY/g, "BRAINSTORM\\_OPEN\\_QUESTIONS\\_READY");
+    .replace(
+      /BRAINSTORM_OPEN_QUESTIONS_READY/g,
+      "BRAINSTORM\\_OPEN\\_QUESTIONS\\_READY",
+    );
 }
 
 /** Format Q+A pairs as markdown for prompt injection */
@@ -125,9 +132,11 @@ export function parseOpenQuestions(markdown: string): string[] {
       .slice(headingMatch.index + headingMatch[0].length)
       .replace(/^\r?\n/, "");
     const nextHeadingIndex = afterHeading.search(/\r?\n##\s+/);
-    const section = (nextHeadingIndex >= 0
-      ? afterHeading.slice(0, nextHeadingIndex)
-      : afterHeading).trim();
+    const section = (
+      nextHeadingIndex >= 0
+        ? afterHeading.slice(0, nextHeadingIndex)
+        : afterHeading
+    ).trim();
     if (!section) return [];
 
     return section
@@ -169,7 +178,8 @@ export function skipQuestions(state: BrainstormState): BrainstormState {
       ...state.answers,
       {
         question: "[SKIP]",
-        answer: "User skipped open questions. Proceeding with best-effort planning.",
+        answer:
+          "User skipped open questions. Proceeding with best-effort planning.",
       },
     ],
   };
@@ -185,7 +195,11 @@ export function doneAnswering(state: BrainstormState): BrainstormState {
 // ============================================================================
 
 export interface BrainstormAgentEndResult {
-  action: "suppress" | "transition-to-awaiting" | "transition-to-planning" | "advance";
+  action:
+    | "suppress"
+    | "transition-to-awaiting"
+    | "transition-to-planning"
+    | "advance";
   questions?: string[];
   error?: string;
 }
@@ -212,7 +226,10 @@ export function processBrainstormAgentEnd(
         questions = parseOpenQuestions(openQuestionsContent);
       }
       if (questions.length === 0) {
-        return { action: "transition-to-planning", error: "No open questions found. Proceeding directly to planning." };
+        return {
+          action: "transition-to-planning",
+          error: "No open questions found. Proceeding directly to planning.",
+        };
       }
       return { action: "transition-to-awaiting", questions };
     }

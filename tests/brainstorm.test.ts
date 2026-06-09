@@ -23,7 +23,10 @@ import {
   BRAINSTORM_OPEN_QUESTIONS_READY,
 } from "../pi/extensions/ralplan/signals.js";
 import type { RalplanState } from "../pi/extensions/ralplan/state.js";
-import { buildPipelineTracking, DEFAULT_PIPELINE_CONFIG } from "../pi/extensions/ralplan/pipeline.js";
+import {
+  buildPipelineTracking,
+  DEFAULT_PIPELINE_CONFIG,
+} from "../pi/extensions/ralplan/pipeline.js";
 
 describe("createBrainstormState", () => {
   it("returns correct default state", () => {
@@ -56,7 +59,10 @@ describe("appendAnswer", () => {
     const state = createBrainstormState();
     const result = appendAnswer(state, "What architecture?", "Microservices");
     expect(result.answers).toHaveLength(1);
-    expect(result.answers[0]).toEqual({ question: "What architecture?", answer: "Microservices" });
+    expect(result.answers[0]).toEqual({
+      question: "What architecture?",
+      answer: "Microservices",
+    });
   });
 
   it("returns new object (immutability)", () => {
@@ -93,7 +99,10 @@ describe("formatAnswersForPrompt", () => {
 
 describe("isAwaitingAnswers", () => {
   it("returns true for awaiting-answers", () => {
-    const state = transitionSubPhase(createBrainstormState(), "awaiting-answers");
+    const state = transitionSubPhase(
+      createBrainstormState(),
+      "awaiting-answers",
+    );
     expect(isAwaitingAnswers(state)).toBe(true);
   });
 
@@ -117,7 +126,10 @@ describe("shouldSuppressSignals", () => {
     };
     expect(shouldSuppressSignals(ralplanState)).toBe(true); // expanding
 
-    ralplanState.brainstorm = transitionSubPhase(ralplanState.brainstorm!, "awaiting-answers");
+    ralplanState.brainstorm = transitionSubPhase(
+      ralplanState.brainstorm!,
+      "awaiting-answers",
+    );
     expect(shouldSuppressSignals(ralplanState)).toBe(true); // awaiting-answers
   });
 
@@ -211,7 +223,10 @@ describe("skipQuestions", () => {
   });
 
   it("transitions from awaiting-answers to planning", () => {
-    const state = transitionSubPhase(createBrainstormState(), "awaiting-answers");
+    const state = transitionSubPhase(
+      createBrainstormState(),
+      "awaiting-answers",
+    );
     const result = skipQuestions(state);
     expect(result.subPhase).toBe("planning");
     expect(result.answers).toHaveLength(1);
@@ -220,7 +235,10 @@ describe("skipQuestions", () => {
 
 describe("doneAnswering", () => {
   it("transitions from awaiting-answers to planning", () => {
-    const state = transitionSubPhase(createBrainstormState(), "awaiting-answers");
+    const state = transitionSubPhase(
+      createBrainstormState(),
+      "awaiting-answers",
+    );
     const result = doneAnswering(state);
     expect(result.subPhase).toBe("planning");
   });
@@ -228,11 +246,21 @@ describe("doneAnswering", () => {
 
 describe("detectBrainstormSignal", () => {
   it("detects OPEN_QUESTIONS_READY signal", () => {
-    expect(detectBrainstormSignal("Some text BRAINSTORM_OPEN_QUESTIONS_READY more text", BRAINSTORM_OPEN_QUESTIONS_READY)).toBe(true);
+    expect(
+      detectBrainstormSignal(
+        "Some text BRAINSTORM_OPEN_QUESTIONS_READY more text",
+        BRAINSTORM_OPEN_QUESTIONS_READY,
+      ),
+    ).toBe(true);
   });
 
   it("returns false for absent signal", () => {
-    expect(detectBrainstormSignal("Some text without the signal", BRAINSTORM_OPEN_QUESTIONS_READY)).toBe(false);
+    expect(
+      detectBrainstormSignal(
+        "Some text without the signal",
+        BRAINSTORM_OPEN_QUESTIONS_READY,
+      ),
+    ).toBe(false);
   });
 });
 describe("sanitizeForPrompt", () => {
@@ -275,13 +303,25 @@ describe("processBrainstormAgentEnd", () => {
 
   it("suppresses signals in expanding sub-phase", () => {
     const state = makeState("expanding");
-    const result = processBrainstormAgentEnd(state, "some text", null, noOpDetectBrainstorm, noOpDetectSignal);
+    const result = processBrainstormAgentEnd(
+      state,
+      "some text",
+      null,
+      noOpDetectBrainstorm,
+      noOpDetectSignal,
+    );
     expect(result.action).toBe("suppress");
   });
 
   it("suppresses signals in awaiting-answers sub-phase", () => {
     const state = makeState("awaiting-answers");
-    const result = processBrainstormAgentEnd(state, "some text", null, noOpDetectBrainstorm, noOpDetectSignal);
+    const result = processBrainstormAgentEnd(
+      state,
+      "some text",
+      null,
+      noOpDetectBrainstorm,
+      noOpDetectSignal,
+    );
     expect(result.action).toBe("suppress");
   });
 
@@ -305,7 +345,7 @@ describe("processBrainstormAgentEnd", () => {
     const result = processBrainstormAgentEnd(
       state,
       "done BRAINSTORM_OPEN_QUESTIONS_READY",
-      "",  // empty questions content
+      "", // empty questions content
       detectBrainstorm,
       noOpDetectSignal,
     );
@@ -315,7 +355,7 @@ describe("processBrainstormAgentEnd", () => {
 
   it("allows PIPELINE_RALPLAN_COMPLETE in planning sub-phase", () => {
     const state = makeState("planning");
-    const detectSignal = (_t: string, _s: string) => true;  // simulate detection
+    const detectSignal = (_t: string, _s: string) => true; // simulate detection
     const result = processBrainstormAgentEnd(
       state,
       "done PIPELINE_RALPLAN_COMPLETE",
@@ -328,7 +368,7 @@ describe("processBrainstormAgentEnd", () => {
 
   it("suppresses PIPELINE_RALPLAN_COMPLETE in expanding", () => {
     const state = makeState("expanding");
-    const detectSignal = (_t: string, _s: string) => true;  // simulate detection
+    const detectSignal = (_t: string, _s: string) => true; // simulate detection
     const result = processBrainstormAgentEnd(
       state,
       "done PIPELINE_RALPLAN_COMPLETE",
