@@ -48,7 +48,7 @@ describe("ralplan extension worktree behavior", () => {
       execSync("git config user.email test@example.com", { stdio: "pipe" });
       execSync("git config user.name test", { stdio: "pipe" });
       writeFileSync("README.md", "x\n", "utf-8");
-      execSync("git add README.md && git commit -m init", {
+      execSync("git add -f README.md && git commit -m init", {
         stdio: "pipe",
         shell: "/bin/bash",
       });
@@ -98,7 +98,7 @@ describe("ralplan extension worktree behavior", () => {
       execSync("git config user.email test@example.com", { stdio: "pipe" });
       execSync("git config user.name test", { stdio: "pipe" });
       writeFileSync("README.md", "x\n", "utf-8");
-      execSync("git add README.md && git commit -m init", {
+      execSync("git add -f README.md && git commit -m init", {
         stdio: "pipe",
         shell: "/bin/bash",
       });

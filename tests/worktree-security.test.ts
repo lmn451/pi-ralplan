@@ -29,7 +29,9 @@ describe("worktree security", () => {
         execSync("git config user.email test@example.com", { stdio: "pipe" });
         execSync("git config user.name test", { stdio: "pipe" });
         writeFileSync("README.md", "x\n", "utf-8");
-        execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+        execSync("git add -f README.md && git commit -m init", {
+          stdio: "pipe",
+        });
 
         const branch = detectDefaultBranch(dir);
         expect(branch).toBe("main");
@@ -50,7 +52,9 @@ describe("worktree security", () => {
         execSync("git config user.email test@example.com", { stdio: "pipe" });
         execSync("git config user.name test", { stdio: "pipe" });
         writeFileSync("README.md", "x\n", "utf-8");
-        execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+        execSync("git add -f README.md && git commit -m init", {
+          stdio: "pipe",
+        });
 
         const branch = detectDefaultBranch(dir);
         expect(branch).toBe("master");
@@ -76,7 +80,9 @@ describe("worktree security", () => {
         execSync("git config user.email test@example.com", { stdio: "pipe" });
         execSync("git config user.name test", { stdio: "pipe" });
         writeFileSync("README.md", "x\n", "utf-8");
-        execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+        execSync("git add -f README.md && git commit -m init", {
+          stdio: "pipe",
+        });
 
         // Try to inject via baseBranch
         const result = createWorktree(
@@ -112,7 +118,9 @@ describe("worktree security", () => {
         execSync("git config user.email test@example.com", { stdio: "pipe" });
         execSync("git config user.name test", { stdio: "pipe" });
         writeFileSync("README.md", "x\n", "utf-8");
-        execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+        execSync("git add -f README.md && git commit -m init", {
+          stdio: "pipe",
+        });
 
         // Name contains shell metacharacters but gets sanitized
         const result = createWorktree(
@@ -143,7 +151,9 @@ describe("worktree security", () => {
         execSync("git config user.email test@example.com", { stdio: "pipe" });
         execSync("git config user.name test", { stdio: "pipe" });
         writeFileSync("README.md", "x\n", "utf-8");
-        execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+        execSync("git add -f README.md && git commit -m init", {
+          stdio: "pipe",
+        });
 
         // Create worktree - should succeed with legitimate name
         const result = createWorktree(
@@ -172,7 +182,9 @@ describe("worktree security", () => {
         execSync("git config user.email test@example.com", { stdio: "pipe" });
         execSync("git config user.name test", { stdio: "pipe" });
         writeFileSync("README.md", "x\n", "utf-8");
-        execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+        execSync("git add -f README.md && git commit -m init", {
+          stdio: "pipe",
+        });
 
         const wtResult = createWorktree(
           { baseBranch: "main", worktreeRoot: worktrees, createBranch: true },
@@ -203,7 +215,7 @@ describe("createWorktree() happy path", () => {
       execSync("git config user.email test@example.com", { stdio: "pipe" });
       execSync("git config user.name test", { stdio: "pipe" });
       writeFileSync("README.md", "x\n", "utf-8");
-      execSync("git add README.md && git commit -m init", { stdio: "pipe" });
+      execSync("git add -f README.md && git commit -m init", { stdio: "pipe" });
 
       const worktreesDir = join(dir, "worktrees");
       const result = createWorktree(
