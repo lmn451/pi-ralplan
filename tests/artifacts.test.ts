@@ -14,7 +14,6 @@ import {
   isPlanningComplete,
   writeArtifact,
 } from "../pi/extensions/ralplan/artifacts.js";
-import { createADR } from "../pi/extensions/ralplan/adr.js";
 
 let tempDir: string;
 let plansDir: string;

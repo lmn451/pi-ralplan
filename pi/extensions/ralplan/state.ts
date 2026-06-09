@@ -10,7 +10,6 @@ import { dirname } from "node:path";
 import { resolveStatePath, resolveAnswersPath } from "./utils.js";
 import type { PipelineTracking } from "./pipeline.js";
 import type { BrainstormState } from "./brainstorm.js";
-import type { ConsensusState } from "./consensus.js";
 
 export type RalplanMode = "ralplan" | "brainstorm";
 
@@ -24,7 +23,6 @@ export interface RalplanState {
   planPath?: string;
   answersPath?: string;
   brainstorm?: BrainstormState;
-  consensusState?: ConsensusState;
   sessionId?: string;
   startedAt: string;
   completedAt?: string;
