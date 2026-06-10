@@ -1,4 +1,5 @@
 import type { RalplanState } from "./state.js";
+import type { PipelineStageId } from "./pipeline.js";
 
 // ============================================================================
 // TYPES
@@ -211,7 +212,7 @@ export function processBrainstormAgentEnd(
   lastText: string,
   openQuestionsContent: string | null,
   detectBrainstormSignalFn: (text: string, signal: string) => boolean,
-  detectSignalFn: (text: string, stageId: string) => boolean,
+  detectSignalFn: (text: string, stageId: PipelineStageId) => boolean,
 ): BrainstormAgentEndResult {
   const sub = state.brainstorm?.subPhase;
 

@@ -237,8 +237,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         case "planning":
           statusText = "🧠 Planning (Consensus)";
           break;
-        default:
-          statusText = "🧠 Brainstorm";
+        default: {
+          const _exhaustive: never = sub;
+          statusText = `🠠 Brainstorm (${_exhaustive})`;
+        }
       }
       ctx.ui.setStatus("ralplan", ctx.ui.theme.fg("accent", statusText));
       ctx.ui.setWidget("ralplan-progress", formatPipelineHUD(state.pipeline));
@@ -984,12 +986,16 @@ ${prompt}`,
         lastText,
         openQuestionsContent,
         detectBrainstormSignal,
-        (text, stageId) => detectSignal(text, stageId as PipelineStageId),
+        (text, stageId) => detectSignal(text, stageId),
       );
 
       switch (decision.action) {
         case "suppress":
           return;
+        default: {
+          const _exhaustive: never = decision.action;
+          throw new Error(`Unknown brainstorm action: ${_exhaustive}`);
+        }
 
         case "transition-to-awaiting": {
           const questions = decision.questions ?? [];

@@ -144,8 +144,10 @@ export const ralplanAdapter: PipelineStageAdapter = {
           return getBrainstormSteeringPrompt();
         case "planning":
           return getBrainstormResumePrompt(context);
-        default:
-          return getBrainstormExpansionPrompt(context);
+        default: {
+          const _exhaustive: never = sub;
+          throw new Error(`Unknown brainstorm sub-phase: ${_exhaustive}`);
+        }
       }
     }
 

@@ -150,9 +150,7 @@ export function buildPipelineTracking(
     const isActive = adapter && !adapter.shouldSkip(config);
     return {
       id: stageId,
-      status: isActive
-        ? ("pending" as StageStatus)
-        : ("skipped" as StageStatus),
+      status: isActive ? "pending" : "skipped",
       iterations: 0,
     };
   });
@@ -388,6 +386,13 @@ export function getPipelineStatus(tracking: PipelineTracking): {
       case "skipped":
         skipped.push(stage.id);
         break;
+      case "failed":
+        // A failed stage surfaces in the UI but not the status counters.
+        break;
+      default: {
+        const _exhaustive: never = stage.status;
+        throw new Error(`Unknown stage status: ${_exhaustive}`);
+      }
     }
   }
 
@@ -428,6 +433,10 @@ export function formatPipelineHUD(tracking: PipelineTracking): string[] {
       case "failed":
         lines.push(`[!!] ${name}`);
         break;
+      default: {
+        const _exhaustive: never = stage.status;
+        throw new Error(`Unknown stage status: ${_exhaustive}`);
+      }
     }
   }
   return lines;
