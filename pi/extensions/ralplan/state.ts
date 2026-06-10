@@ -66,18 +66,13 @@ export function readRalplanStateFile(directory: string): RalplanState | null {
       (parsed.sessionId != null && typeof parsed.sessionId !== "string") ||
       typeof parsed.mode !== "string"
     ) {
-      console.warn("[ralplan] State file has invalid shape, treating as empty");
       return null;
     }
 
     return parsed as unknown as RalplanState;
-  } catch (error) {
+  } catch {
     // State file read failed - could be corruption, permissions, etc.
     // Return null to treat as no state
-    console.warn(
-      "[ralplan] Failed to read state file:",
-      error instanceof Error ? error.message : error,
-    );
     return null;
   }
 }
@@ -122,10 +117,9 @@ export function buildDefaultState(
     originalIdea: idea,
     specPath: `plans/${getDefaultArtifactFilename("spec")}`,
     planPath: `plans/${getDefaultArtifactFilename("plan")}`,
-    sessionId,
+    ...(sessionId !== undefined && { sessionId }),
     startedAt: new Date().toISOString(),
-    worktreePath: undefined, // Set after worktree creation
-    sessionCwd, // Original directory (for worktree path derivation)
+    ...(sessionCwd !== undefined && { sessionCwd }),
   };
 
   if (mode === "brainstorm") {

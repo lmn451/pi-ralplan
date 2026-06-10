@@ -7,7 +7,7 @@ export const DEFAULT_DATE_FORMAT = "YYYY-MM-DD";
 
 /** Format date as YYYY-MM-DD (ISO format) */
 export function formatDate(date: Date = new Date()): string {
-  return date.toISOString().split("T")[0]; // "YYYY-MM-DD"
+  return date.toISOString().slice(0, 10); // "YYYY-MM-DD"
 }
 
 /** Sanitize description for URL-safe filename */

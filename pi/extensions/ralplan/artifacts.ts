@@ -144,8 +144,8 @@ export function isPlanningComplete(artifacts: PlanningArtifacts): boolean {
     return false;
   }
 
-  const latestSpec = readFileSafe(artifacts.specPaths[0]);
-  const latestPlan = readFileSafe(artifacts.planPaths[0]);
+  const latestSpec = readFileSafe(artifacts.specPaths[0]!);
+  const latestPlan = readFileSafe(artifacts.planPaths[0]!);
   if (!latestSpec || !latestPlan) return false;
 
   return (
