@@ -24,22 +24,16 @@ import {
   generateSpecFilename,
 } from "./naming.js";
 import { createWorktreeForRalplan } from "./worktree.js";
-import { resolveWorktreeRoot } from "./utils.js";
+import { deriveWorktreeName, resolveWorktreeRoot } from "./utils.js";
 
 export { RALPLAN_COMPLETION_SIGNAL };
 export { EXECUTION_COMPLETION_SIGNAL };
 export { RALPH_COMPLETION_SIGNAL };
 export { QA_COMPLETION_SIGNAL };
 
-/** Generate worktree name from idea */
+/** Generate worktree name from idea. Deprecated — use `deriveWorktreeName` from `utils.js` instead. */
 export function generateWorktreeName(idea: string): string {
-  // Sanitize and truncate for worktree name
-  const sanitized = idea
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
-  return sanitized || "plan";
+  return deriveWorktreeName(idea);
 }
 
 export function getWorktreeCreationSection(context: PipelineContext): string {
@@ -242,11 +236,6 @@ export const executionAdapter: PipelineStageAdapter = {
     );
     if (result.success && result.path) {
       context.worktreePath = result.path;
-      console.log(
-        `[ralplan] Worktree created at execution entry: ${result.path}`,
-      );
-    } else {
-      console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
     }
   },
 

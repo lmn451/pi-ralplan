@@ -201,15 +201,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
 
   function deactivateState(): void {
     if (state) {
-      // Best-effort worktree cleanup — warn but don't block deactivation
+      // Best-effort worktree cleanup — don't block deactivation on failure
       if (state.worktreePath) {
         try {
-          const result = cleanupWorktree(state.worktreePath);
-          if (!result.success) {
-            console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
-          } else {
-            console.log(`[ralplan] Worktree cleaned up: ${state.worktreePath}`);
-          }
+          cleanupWorktree(state.worktreePath);
         } catch {
           // cleanup not available or already removed
         }
@@ -329,18 +324,11 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
 
     // Create worktree (guards against double-creation in executionAdapter.onEnter)
     const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-    if (worktreeResult.success && worktreeResult.path) {
-      console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
-    } else {
-      console.warn(
-        `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+    if (!worktreeResult.success && options.notifyWorktreeFailure) {
+      ctx.ui.notify(
+        `Worktree creation failed: ${worktreeResult.error}`,
+        "warning",
       );
-      if (options.notifyWorktreeFailure) {
-        ctx.ui.notify(
-          `Worktree creation failed: ${worktreeResult.error}`,
-          "warning",
-        );
-      }
     }
 
     state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);

@@ -56,3 +56,17 @@ export function escapeForPrompt(text: string): string {
 export function nowISO(): string {
   return new Date().toISOString();
 }
+
+/**
+ * Derive a filesystem-safe worktree name from an idea string.
+ * Single source of truth — used by both the prompt section (adapters.ts) and
+ * the actual on-disk creation (worktree.ts).
+ */
+export function deriveWorktreeName(idea: string): string {
+  const sanitized = idea
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  return sanitized || "plan";
+}
