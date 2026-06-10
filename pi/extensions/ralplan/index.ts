@@ -57,7 +57,6 @@ import {
   writeArtifact,
 } from "./artifacts.js";
 
-import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 import { resolveOpenQuestionsPath } from "./utils.js";
 
 import { createWorktreeForRalplan, cleanupWorktree } from "./worktree.js";
@@ -826,15 +825,6 @@ ${prompt}`,
       updateUI(ctx);
       // Stay in awaiting-answers — do NOT transition to planning
       return { action: "continue" };
-    }
-
-    // Ralplan-first gate: if user makes a broad request and no active session,
-    // suggest ralplan first. Skip if explicitly bypassed.
-    if (!isActive() && looksLikeBroadRequest(text) && !hasBypassPrefix(text)) {
-      ctx.ui.notify(
-        "This looks like a broad request. Consider using /ralplan for consensus planning first, or prefix with 'force:' to bypass.",
-        "info",
-      );
     }
 
     return { action: "continue" };
