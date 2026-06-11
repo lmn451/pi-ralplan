@@ -205,9 +205,9 @@ describe("ralplan extension worktree behavior", () => {
       };
       ralplanExtension(pi2 as never);
 
-      await expect(
-        captured.handler("orphan test", ctx),
-      ).rejects.toThrow("simulated persistState failure");
+      await expect(captured.handler("orphan test", ctx)).rejects.toThrow(
+        "simulated persistState failure",
+      );
 
       // The worktree directory must NOT exist on disk after the failure.
       const worktreeParent = join(dir, "repo-worktrees");

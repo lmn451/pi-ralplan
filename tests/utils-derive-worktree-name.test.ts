@@ -3,7 +3,9 @@ import { deriveWorktreeName } from "../pi/extensions/ralplan/utils.js";
 
 describe("deriveWorktreeName", () => {
   it("lowercases and replaces non-alphanumerics with dashes", () => {
-    expect(deriveWorktreeName("Build Me A TODO App")).toBe("build-me-a-todo-app");
+    expect(deriveWorktreeName("Build Me A TODO App")).toBe(
+      "build-me-a-todo-app",
+    );
   });
 
   it("strips leading and trailing dashes", () => {

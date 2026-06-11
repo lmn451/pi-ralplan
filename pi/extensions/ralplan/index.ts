@@ -192,9 +192,13 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       planPath: state.planPath || "plans/plan.md",
       ...(state.sessionId !== undefined && { sessionId: state.sessionId }),
       mode: state.mode,
-      ...(state.answersPath !== undefined && { answersPath: state.answersPath }),
+      ...(state.answersPath !== undefined && {
+        answersPath: state.answersPath,
+      }),
       ...(state.brainstorm !== undefined && { brainstorm: state.brainstorm }),
-      ...(state.worktreePath !== undefined && { worktreePath: state.worktreePath }),
+      ...(state.worktreePath !== undefined && {
+        worktreePath: state.worktreePath,
+      }),
       ...(state.sessionCwd !== undefined && { sessionCwd: state.sessionCwd }),
     };
     pi.appendEntry(CUSTOM_TYPE, persisted);
@@ -282,10 +286,14 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         originalIdea: data.originalIdea,
         specPath: data.specPath,
         planPath: data.planPath,
-        ...(data.answersPath !== undefined && { answersPath: data.answersPath }),
+        ...(data.answersPath !== undefined && {
+          answersPath: data.answersPath,
+        }),
         ...(data.brainstorm !== undefined && { brainstorm: data.brainstorm }),
         ...(data.sessionId !== undefined && { sessionId: data.sessionId }),
-        ...(data.worktreePath !== undefined && { worktreePath: data.worktreePath }),
+        ...(data.worktreePath !== undefined && {
+          worktreePath: data.worktreePath,
+        }),
         ...(data.sessionCwd !== undefined && { sessionCwd: data.sessionCwd }),
         startedAt:
           data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),

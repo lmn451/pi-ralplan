@@ -161,7 +161,12 @@ export function createWorktree(
             worktreePath,
             config.baseBranch || DEFAULT_BASE_BRANCH,
           ]
-        : ["worktree", "add", worktreePath, config.baseBranch || DEFAULT_BASE_BRANCH];
+        : [
+            "worktree",
+            "add",
+            worktreePath,
+            config.baseBranch || DEFAULT_BASE_BRANCH,
+          ];
       execFileSync("git", worktreeArgs, { stdio: "pipe", timeout: 30000 });
       worktreeCreated = true;
 
