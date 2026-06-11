@@ -11,7 +11,8 @@ Consensus-driven planning extension for [Pi](https://pi.dev). Brings the RALPLAN
 
 - **Consensus Planning** — Planner → Architect → Critic iteration loop
 - **Configurable Pipeline** — RALPLAN → Execution → Verification → QA
-- **Pre-Execution Gate** — Detects broad requests and suggests planning first
+- **Pre-Execution Gate** — *(removed in 0.1.5; rely on explicit `/ralplan` invocation)*
+
 - **Stage Prompt Injection** — Automatic stage-specific prompts via `before_agent_start`
 - **Signal-Based Advancement** — Detects `PIPELINE_*_COMPLETE` signals to auto-advance
 - **Session Persistence** — Dual persistence: session entries (branch-safe) + file state (resume)
@@ -119,26 +120,7 @@ Add to `.pi/settings.json`:
 | `verification` | `{ engine: "ralph", maxIterations: n }`, `false` | Verification settings            |
 | `qa`           | `true`, `false`                                  | Enable QA stage                  |
 
-## Pre-Execution Gate
 
-When you make a broad request without concrete anchors (file paths, issue numbers, function names), the extension suggests using `/ralplan` first.
-
-**Bypass the gate:** Prefix with `force:` or `!`
-
-```
-force: ralph refactor everything
-! implement auth now
-```
-
-**Passes the gate:** Requests with concrete signals
-
-```
-ralph fix src/hooks/bridge.ts
-implement #42
-fix processKeywordDetector
-```
-
-## Architecture
 
 ```
 User Input → /ralplan Command → Pipeline Init → Stage Machine
@@ -171,8 +153,6 @@ pi/skills/ralplan/
 
 | Issue                               | Solution                                                          |
 | ----------------------------------- | ----------------------------------------------------------------- |
-| Gate fires on well-specified prompt | Add a file reference, function name, or issue number              |
-| Want to bypass the gate             | Prefix with `force:` or `!`                                       |
 | Signal not detected                 | Ensure the exact signal text appears in the assistant response    |
 | State lost after `/tree`            | State is branch-safe; check `/.pi/ralplan/state.json` as fallback |
 | Pipeline stuck                      | Use `/ralplan:skip` to skip the current stage                     |

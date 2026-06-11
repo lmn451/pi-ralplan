@@ -57,7 +57,6 @@ import {
   writeArtifact,
 } from "./artifacts.js";
 
-import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 import { resolveOpenQuestionsPath } from "./utils.js";
 
 import { createWorktreeForRalplan, cleanupWorktree } from "./worktree.js";
@@ -116,21 +115,24 @@ export function buildPipelineContext(
     return join(worktreePath, p);
   };
 
+  const specPath = toWorkspacePath(state.specPath);
+  const planPath = toWorkspacePath(state.planPath);
+  const answersPath = toWorkspacePath(state.answersPath);
   return {
     idea: state.originalIdea,
     directory: sessionCwd,
     cwd: worktreePath ?? sessionCwd,
-    sessionId: state.sessionId,
-    specPath: toWorkspacePath(state.specPath),
-    planPath: toWorkspacePath(state.planPath),
+    ...(state.sessionId !== undefined && { sessionId: state.sessionId }),
+    ...(specPath !== undefined && { specPath }),
+    ...(planPath !== undefined && { planPath }),
     openQuestionsPath: worktreePath
       ? resolveOpenQuestionsPath(worktreePath)
       : "plans/open-questions.md",
-    answersPath: toWorkspacePath(state.answersPath),
+    ...(answersPath !== undefined && { answersPath }),
     config: state.pipeline.pipelineConfig,
     mode: state.mode,
-    brainstorm: state.brainstorm,
-    worktreePath,
+    ...(state.brainstorm !== undefined && { brainstorm: state.brainstorm }),
+    ...(worktreePath !== undefined && { worktreePath }),
   };
 }
 
@@ -188,12 +190,16 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       originalIdea: state.originalIdea,
       specPath: state.specPath || "plans/spec.md",
       planPath: state.planPath || "plans/plan.md",
-      sessionId: state.sessionId,
+      ...(state.sessionId !== undefined && { sessionId: state.sessionId }),
       mode: state.mode,
-      answersPath: state.answersPath,
-      brainstorm: state.brainstorm,
-      worktreePath: state.worktreePath,
-      sessionCwd: state.sessionCwd,
+      ...(state.answersPath !== undefined && {
+        answersPath: state.answersPath,
+      }),
+      ...(state.brainstorm !== undefined && { brainstorm: state.brainstorm }),
+      ...(state.worktreePath !== undefined && {
+        worktreePath: state.worktreePath,
+      }),
+      ...(state.sessionCwd !== undefined && { sessionCwd: state.sessionCwd }),
     };
     pi.appendEntry(CUSTOM_TYPE, persisted);
     writeRalplanStateFile(sessionCwd, state);
@@ -201,15 +207,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
 
   function deactivateState(): void {
     if (state) {
-      // Best-effort worktree cleanup — warn but don't block deactivation
+      // Best-effort worktree cleanup — don't block deactivation on failure
       if (state.worktreePath) {
         try {
-          const result = cleanupWorktree(state.worktreePath);
-          if (!result.success) {
-            console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
-          } else {
-            console.log(`[ralplan] Worktree cleaned up: ${state.worktreePath}`);
-          }
+          cleanupWorktree(state.worktreePath);
         } catch {
           // cleanup not available or already removed
         }
@@ -243,8 +244,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         case "planning":
           statusText = "🧠 Planning (Consensus)";
           break;
-        default:
-          statusText = "🧠 Brainstorm";
+        default: {
+          const _exhaustive: never = sub;
+          statusText = `🠠 Brainstorm (${_exhaustive})`;
+        }
       }
       ctx.ui.setStatus("ralplan", ctx.ui.theme.fg("accent", statusText));
       ctx.ui.setWidget("ralplan-progress", formatPipelineHUD(state.pipeline));
@@ -283,11 +286,15 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
         originalIdea: data.originalIdea,
         specPath: data.specPath,
         planPath: data.planPath,
-        answersPath: data.answersPath,
-        brainstorm: data.brainstorm,
-        sessionId: data.sessionId,
-        worktreePath: data.worktreePath,
-        sessionCwd: data.sessionCwd,
+        ...(data.answersPath !== undefined && {
+          answersPath: data.answersPath,
+        }),
+        ...(data.brainstorm !== undefined && { brainstorm: data.brainstorm }),
+        ...(data.sessionId !== undefined && { sessionId: data.sessionId }),
+        ...(data.worktreePath !== undefined && {
+          worktreePath: data.worktreePath,
+        }),
+        ...(data.sessionCwd !== undefined && { sessionCwd: data.sessionCwd }),
         startedAt:
           data.tracking.stages[0]?.startedAt ?? new Date().toISOString(),
       };
@@ -322,32 +329,41 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       tracking.currentStageIndex >= 0 &&
       tracking.currentStageIndex < tracking.stages.length
     ) {
-      tracking.stages[tracking.currentStageIndex].status = "active";
-      tracking.stages[tracking.currentStageIndex].startedAt =
+      tracking.stages[tracking.currentStageIndex]!.status = "active";
+      tracking.stages[tracking.currentStageIndex]!.startedAt =
         new Date().toISOString();
     }
 
     // Create worktree (guards against double-creation in executionAdapter.onEnter)
     const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
-    if (worktreeResult.success && worktreeResult.path) {
-      console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
-    } else {
-      console.warn(
-        `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
+    if (!worktreeResult.success && options.notifyWorktreeFailure) {
+      ctx.ui.notify(
+        `Worktree creation failed: ${worktreeResult.error}`,
+        "warning",
       );
-      if (options.notifyWorktreeFailure) {
-        ctx.ui.notify(
-          `Worktree creation failed: ${worktreeResult.error}`,
-          "warning",
-        );
-      }
     }
 
     state = buildDefaultState(idea, tracking, undefined, mode, sessionCwd);
-    state.worktreePath = worktreeResult.success
-      ? worktreeResult.path
-      : undefined;
-    persistState();
+    if (worktreeResult.success && worktreeResult.path) {
+      state.worktreePath = worktreeResult.path;
+    }
+    // AC-8: close the leak window between worktree creation and state
+    // persistence. If persistState throws (disk full, permission error, etc.),
+    // remove the just-created worktree so we don't leave an orphan on disk
+    // that no state entry is tracking.
+    try {
+      persistState();
+    } catch (err) {
+      if (state.worktreePath) {
+        try {
+          cleanupWorktree(state.worktreePath);
+        } catch {
+          // best-effort
+        }
+      }
+      state = null;
+      throw err;
+    }
     updateUI(ctx);
 
     return tracking;
@@ -517,7 +533,7 @@ ${prompt}`,
         pi.sendMessage(
           {
             customType: "ralplan-skip",
-            content: `${getTransitionPrompt(stages[currentStageIndex].id, result.adapter.id)}\n\n${prompt}`,
+            content: `${getTransitionPrompt(stages[currentStageIndex]!.id, result.adapter.id)}\n\n${prompt}`,
             display: true,
           },
           { triggerTurn: true, deliverAs: "steer" },
@@ -840,15 +856,6 @@ ${prompt}`,
       return { action: "continue" };
     }
 
-    // Ralplan-first gate: if user makes a broad request and no active session,
-    // suggest ralplan first. Skip if explicitly bypassed.
-    if (!isActive() && looksLikeBroadRequest(text) && !hasBypassPrefix(text)) {
-      ctx.ui.notify(
-        "This looks like a broad request. Consider using /ralplan for consensus planning first, or prefix with 'force:' to bypass.",
-        "info",
-      );
-    }
-
     return { action: "continue" };
   });
 
@@ -1006,12 +1013,16 @@ ${prompt}`,
         lastText,
         openQuestionsContent,
         detectBrainstormSignal,
-        (text, stageId) => detectSignal(text, stageId as PipelineStageId),
+        (text, stageId) => detectSignal(text, stageId),
       );
 
       switch (decision.action) {
         case "suppress":
           return;
+        default: {
+          const _exhaustive: never = decision.action;
+          throw new Error(`Unknown brainstorm action: ${_exhaustive}`);
+        }
 
         case "transition-to-awaiting": {
           const questions = decision.questions ?? [];
@@ -1171,7 +1182,7 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
 
     // Check if max iterations reached before incrementing
     const currentStage =
-      state.pipeline.stages[state.pipeline.currentStageIndex];
+      state.pipeline.stages[state.pipeline.currentStageIndex]!;
     const maxIters =
       state.pipeline.pipelineConfig.verification &&
       typeof state.pipeline.pipelineConfig.verification === "object"

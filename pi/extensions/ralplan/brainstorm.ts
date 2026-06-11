@@ -1,4 +1,5 @@
 import type { RalplanState } from "./state.js";
+import type { PipelineStageId } from "./pipeline.js";
 
 // ============================================================================
 // TYPES
@@ -41,8 +42,9 @@ export function transitionSubPhase(
   return {
     ...state,
     subPhase: target,
-    awaitingSince:
-      target === "awaiting-answers" ? new Date().toISOString() : undefined,
+    ...(target === "awaiting-answers"
+      ? { awaitingSince: new Date().toISOString() }
+      : {}),
   };
 }
 
@@ -160,7 +162,7 @@ export function parseOpenQuestions(markdown: string): string[] {
 export function parseUserAnswer(rawText: string, questions: string[]): QandA {
   // If there's exactly one unanswered question, map to it
   if (questions.length === 1) {
-    return { question: questions[0], answer: rawText };
+    return { question: questions[0]!, answer: rawText };
   }
   // Otherwise, store as freeform
   return { question: "[freeform]", answer: rawText };
@@ -211,7 +213,7 @@ export function processBrainstormAgentEnd(
   lastText: string,
   openQuestionsContent: string | null,
   detectBrainstormSignalFn: (text: string, signal: string) => boolean,
-  detectSignalFn: (text: string, stageId: string) => boolean,
+  detectSignalFn: (text: string, stageId: PipelineStageId) => boolean,
 ): BrainstormAgentEndResult {
   const sub = state.brainstorm?.subPhase;
 

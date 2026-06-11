@@ -150,9 +150,7 @@ export function buildPipelineTracking(
     const isActive = adapter && !adapter.shouldSkip(config);
     return {
       id: stageId,
-      status: isActive
-        ? ("pending" as StageStatus)
-        : ("skipped" as StageStatus),
+      status: isActive ? "pending" : "skipped",
       iterations: 0,
     };
   });
@@ -174,7 +172,7 @@ export function syncTrackingToConfig(
   for (let i = 0; i < stages.length; i++) {
     if (i <= currentStageIndex) continue;
 
-    const stage = stages[i];
+    const stage = stages[i]!;
     if (
       stage.status === "complete" ||
       stage.status === "failed" ||
@@ -193,8 +191,8 @@ export function syncTrackingToConfig(
     }
 
     stage.status = "pending";
-    stage.completedAt = undefined;
-    stage.error = undefined;
+    delete stage.completedAt;
+    delete stage.error;
   }
 
   return tracking;
@@ -210,7 +208,7 @@ export function getCurrentStageAdapter(
   const { stages, currentStageIndex } = tracking;
   if (currentStageIndex < 0 || currentStageIndex >= stages.length) return null;
 
-  const currentStage = stages[currentStageIndex];
+  const currentStage = stages[currentStageIndex]!;
   if (currentStage.status === "skipped" || currentStage.status === "complete") {
     return getNextStageAdapter(tracking);
   }
@@ -222,8 +220,8 @@ export function getNextStageAdapter(
 ): PipelineStageAdapter | null {
   const { stages, currentStageIndex } = tracking;
   for (let i = currentStageIndex + 1; i < stages.length; i++) {
-    if (stages[i].status !== "skipped") {
-      return getAdapterById(stages[i].id) ?? null;
+    if (stages[i]!.status !== "skipped") {
+      return getAdapterById(stages[i]!.id) ?? null;
     }
   }
   return null;
@@ -241,18 +239,18 @@ export function advanceStage(
 
   // Call onExit for current stage
   if (context && currentStageIndex >= 0 && currentStageIndex < stages.length) {
-    const currentAdapter = getAdapterById(stages[currentStageIndex].id);
+    const currentAdapter = getAdapterById(stages[currentStageIndex]!.id);
     currentAdapter?.onExit?.(context);
   }
 
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
-    stages[currentStageIndex].status = "complete";
-    stages[currentStageIndex].completedAt = nowISO();
+    stages[currentStageIndex]!.status = "complete";
+    stages[currentStageIndex]!.completedAt = nowISO();
   }
 
   let nextIndex = -1;
   for (let i = currentStageIndex + 1; i < stages.length; i++) {
-    if (stages[i].status !== "skipped") {
+    if (stages[i]!.status !== "skipped") {
       nextIndex = i;
       break;
     }
@@ -264,14 +262,14 @@ export function advanceStage(
   }
 
   tracking.currentStageIndex = nextIndex;
-  stages[nextIndex].status = "active";
-  stages[nextIndex].startedAt = nowISO();
+  stages[nextIndex]!.status = "active";
+  stages[nextIndex]!.startedAt = nowISO();
 
-  const nextAdapter = getAdapterById(stages[nextIndex].id);
+  const nextAdapter = getAdapterById(stages[nextIndex]!.id);
   if (!nextAdapter) {
-    stages[nextIndex].status = "failed";
-    stages[nextIndex].error =
-      `No adapter registered for stage "${stages[nextIndex].id}"`;
+    stages[nextIndex]!.status = "failed";
+    stages[nextIndex]!.error =
+      `No adapter registered for stage "${stages[nextIndex]!.id}"`;
     return { adapter: null, phase: "failed", tracking };
   }
 
@@ -280,7 +278,7 @@ export function advanceStage(
     nextAdapter.onEnter?.(context);
   }
 
-  return { adapter: nextAdapter, phase: stages[nextIndex].id, tracking };
+  return { adapter: nextAdapter, phase: stages[nextIndex]!.id, tracking };
 }
 
 export function skipCurrentStage(
@@ -294,18 +292,18 @@ export function skipCurrentStage(
   const { stages, currentStageIndex } = tracking;
 
   if (context && currentStageIndex >= 0 && currentStageIndex < stages.length) {
-    const currentAdapter = getAdapterById(stages[currentStageIndex].id);
+    const currentAdapter = getAdapterById(stages[currentStageIndex]!.id);
     currentAdapter?.onExit?.(context);
   }
 
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
-    stages[currentStageIndex].status = "skipped";
-    stages[currentStageIndex].completedAt = nowISO();
+    stages[currentStageIndex]!.status = "skipped";
+    stages[currentStageIndex]!.completedAt = nowISO();
   }
 
   let nextIndex = -1;
   for (let i = currentStageIndex + 1; i < stages.length; i++) {
-    if (stages[i].status !== "skipped") {
+    if (stages[i]!.status !== "skipped") {
       nextIndex = i;
       break;
     }
@@ -317,14 +315,14 @@ export function skipCurrentStage(
   }
 
   tracking.currentStageIndex = nextIndex;
-  stages[nextIndex].status = "active";
-  stages[nextIndex].startedAt = nowISO();
+  stages[nextIndex]!.status = "active";
+  stages[nextIndex]!.startedAt = nowISO();
 
-  const nextAdapter = getAdapterById(stages[nextIndex].id);
+  const nextAdapter = getAdapterById(stages[nextIndex]!.id);
   if (!nextAdapter) {
-    stages[nextIndex].status = "failed";
-    stages[nextIndex].error =
-      `No adapter registered for stage "${stages[nextIndex].id}"`;
+    stages[nextIndex]!.status = "failed";
+    stages[nextIndex]!.error =
+      `No adapter registered for stage "${stages[nextIndex]!.id}"`;
     return { adapter: null, phase: "failed", tracking };
   }
 
@@ -332,7 +330,7 @@ export function skipCurrentStage(
     nextAdapter.onEnter?.(context);
   }
 
-  return { adapter: nextAdapter, phase: stages[nextIndex].id, tracking };
+  return { adapter: nextAdapter, phase: stages[nextIndex]!.id, tracking };
 }
 
 export function failCurrentStage(
@@ -341,8 +339,8 @@ export function failCurrentStage(
 ): PipelineTracking {
   const { stages, currentStageIndex } = tracking;
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
-    stages[currentStageIndex].status = "failed";
-    stages[currentStageIndex].error = error;
+    stages[currentStageIndex]!.status = "failed";
+    stages[currentStageIndex]!.error = error;
   }
   return tracking;
 }
@@ -352,7 +350,7 @@ export function incrementStageIteration(
 ): PipelineTracking {
   const { stages, currentStageIndex } = tracking;
   if (currentStageIndex >= 0 && currentStageIndex < stages.length) {
-    stages[currentStageIndex].iterations++;
+    stages[currentStageIndex]!.iterations++;
   }
   return tracking;
 }
@@ -388,6 +386,13 @@ export function getPipelineStatus(tracking: PipelineTracking): {
       case "skipped":
         skipped.push(stage.id);
         break;
+      case "failed":
+        // A failed stage surfaces in the UI but not the status counters.
+        break;
+      default: {
+        const _exhaustive: never = stage.status;
+        throw new Error(`Unknown stage status: ${_exhaustive}`);
+      }
     }
   }
 
@@ -428,6 +433,10 @@ export function formatPipelineHUD(tracking: PipelineTracking): string[] {
       case "failed":
         lines.push(`[!!] ${name}`);
         break;
+      default: {
+        const _exhaustive: never = stage.status;
+        throw new Error(`Unknown stage status: ${_exhaustive}`);
+      }
     }
   }
   return lines;
