@@ -47,6 +47,7 @@ git push origin master --follow-tags
 ## CI/CD
 
 The `Publish` workflow triggers on `v*` tags and:
+
 - Sets up Node.js 24
 - Runs `npm ci`
 - Verifies tag matches `package.json` version
@@ -68,7 +69,7 @@ After that, configure the trusted publisher and all future releases go through C
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| 404 on publish | Verify trusted publisher config on npmjs.com matches exactly |
-| Workflow didn't run | Ensure tag matches `v*` and was pushed to remote |
+| Issue               | Solution                                                     |
+| ------------------- | ------------------------------------------------------------ |
+| 404 on publish      | Verify trusted publisher config on npmjs.com matches exactly |
+| Workflow didn't run | Ensure tag matches `v*` and was pushed to remote             |
