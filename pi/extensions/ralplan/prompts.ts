@@ -21,36 +21,25 @@ Your task: Expand this product idea into detailed requirements and technical spe
 
 **Original Idea:** "${escapeForPrompt(idea)}"
 
-### Step 1: Spawn Analyst for Requirements
+### Step 1: Spawn Analyst Agent for Requirements
 
-Spawn an analyst subagent to extract requirements:
+Spawn an agent with the **Analyst** role to extract requirements:
 
-\`\`\`
-Task(
-  agent="analyst",
-  prompt="REQUIREMENTS ANALYSIS for: ${escapeForPrompt(idea)}
+**Analyst Task: REQUIREMENTS ANALYSIS**
+- Functional requirements (what it must do)
+- Non-functional requirements (performance, UX, etc.)
+- Implicit requirements (things user didn't say but needs)
+- Out of scope items
 
-Extract and document:
-1. Functional requirements (what it must do)
-2. Non-functional requirements (performance, UX, etc.)
-3. Implicit requirements (things user didn't say but needs)
-4. Out of scope items
+Output as structured markdown with clear sections.
 
-Output as structured markdown with clear sections."
-)
-\`\`\`
+WAIT for the Analyst agent to complete before proceeding.
 
-WAIT for Analyst to complete before proceeding.
+### Step 2: Spawn Architect Agent for Technical Spec
 
-### Step 2: Spawn Architect for Technical Spec
+After the Analyst completes, spawn an agent with the **Architect** role:
 
-After Analyst completes, spawn Architect:
-
-\`\`\`
-Task(
-  agent="architect",
-  prompt="TECHNICAL SPECIFICATION for: ${escapeForPrompt(idea)}
-
+**Architect Task: TECHNICAL SPECIFICATION**
 Based on the requirements analysis above, create:
 1. Tech stack decisions with rationale
 2. Architecture overview (patterns, layers)
@@ -58,10 +47,9 @@ Based on the requirements analysis above, create:
 4. Dependencies list (packages)
 5. API/interface definitions
 
-Output as structured markdown."
-)
-\`\`\`
+Output as structured markdown.
 
+### Step 2.5: Persist Open Questions
 ### Step 2.5: Persist Open Questions
 
 If the Analyst output includes a \`## Open Questions\` section, extract those items and save them to \`plans/open-questions.md\` using the standard format:
@@ -101,13 +89,9 @@ Read the specification at: ${specPath}
 
 ### Step 2: Create Plan via Architect
 
-Spawn Architect to create the implementation plan:
+Spawn an agent with the **Architect** role to create the implementation plan:
 
-\`\`\`
-Task(
-  agent="architect",
-  prompt="CREATE IMPLEMENTATION PLAN
-
+**Architect Task: CREATE IMPLEMENTATION PLAN**
 Read the specification at: ${specPath}
 
 Generate a comprehensive implementation plan with:
@@ -131,19 +115,13 @@ Generate a comprehensive implementation plan with:
    - Mitigation strategies
 
 Save to: ${planPath}
-Signal completion with: PLAN_CREATED"
-)
-\`\`\`
+Signal completion with: PLAN_CREATED
 
 ### Step 3: Validate Plan via Critic
 
-After Architect creates the plan:
+After the Architect creates the plan, spawn an agent with the **Critic** role:
 
-\`\`\`
-Task(
-  agent="critic",
-  prompt="REVIEW IMPLEMENTATION PLAN
-
+**Critic Task: REVIEW IMPLEMENTATION PLAN**
 Plan file: ${planPath}
 Original spec: ${specPath}
 
@@ -154,7 +132,7 @@ Verify:
 4. Dependencies are correctly identified
 5. Risks are addressed
 
-Verdict: OKAY or REJECT with specific issues"
+Verdict: OKAY or REJECT with specific issues
 )
 \`\`\`
 
@@ -178,16 +156,16 @@ Read the implementation plan at: \`${planPath}\`
 
 ### Team Execution
 
-Use subagents to execute tasks in parallel where possible:
+Use separate agents to execute tasks in parallel where possible:
 
 1. **Create tasks** from the implementation plan
-2. **Spawn executor subagents** for independent tasks
-3. **Monitor progress** as subagents complete tasks
+2. **Spawn executor agents** for independent tasks
+3. **Monitor progress** as agents complete tasks
 4. **Coordinate** dependencies between tasks
 
 ### Output Contract
 
-Every subagent response must stay concise: return ONLY a short execution summary under 100 words covering what changed, files touched, verification status, and blockers. Store bulky logs/details in files or artifacts and reference them briefly.
+Every spawned agent response must stay concise: return ONLY a short execution summary under 100 words covering what changed, files touched, verification status, and blockers. Store bulky logs/details in files or artifacts and reference them briefly.
 
 ### Agent Selection
 
@@ -226,12 +204,12 @@ Execute tasks sequentially (or with limited parallelism via background agents):
 
 1. Read and understand each task from the plan
 2. Execute tasks in dependency order
-3. Use subagents for independent tasks that can run in parallel
+3. Use separate agents for independent tasks that can run in parallel
 4. Track progress in a TODO list
 
 ### Output Contract
 
-Every spawned subagent response must return ONLY a short execution summary under 100 words covering: what changed, files touched, verification status, and blockers. Store bulky logs/details in files or artifacts and reference them briefly.
+Every spawned agent response must return ONLY a short execution summary under 100 words covering: what changed, files touched, verification status, and blockers. Store bulky logs/details in files or artifacts and reference them briefly.
 
 ### Progress Tracking
 
@@ -302,32 +280,23 @@ Verify the implementation against the specification using the Ralph verification
 
 ### Verification Process
 
-Spawn parallel verification reviewers:
+Spawn parallel verification reviewers. Each reviewer runs as a separate agent and receives the spec and implementation to evaluate.
 
 Each reviewer must return ONLY a concise review summary under 100 words covering verdict, evidence highlights, files checked, and blockers. Avoid dumping long logs or transcripts into the main session.
 
-\`\`\`
-// Functional Completeness Review
-Task(
-  agent="architect",
-  prompt="FUNCTIONAL COMPLETENESS REVIEW
-
+**Reviewer 1 — Functional Completeness**
+Agent persona: Architect or equivalent
 Read the original spec at: ${specPath}
-
 Verify:
 1. All functional requirements are implemented
 2. All non-functional requirements are addressed
 3. All acceptance criteria from the plan are met
 4. No missing features or incomplete implementations
 
-Verdict: APPROVE (all requirements met) or REJECTED (with specific gaps)"
-)
+Verdict: APPROVE (all requirements met) or REJECTED (with specific gaps)
 
-// Security Review
-Task(
-  agent="security-reviewer",
-  prompt="SECURITY REVIEW
-
+**Reviewer 2 — Security**
+Agent persona: Security reviewer
 Check the implementation for:
 1. OWASP Top 10 vulnerabilities
 2. Input validation and sanitization
@@ -336,14 +305,10 @@ Check the implementation for:
 5. Injection vulnerabilities (SQL, command, XSS)
 6. Hardcoded secrets or credentials
 
-Verdict: APPROVE (no vulnerabilities) or REJECTED (with specific issues)"
-)
+Verdict: APPROVE (no vulnerabilities) or REJECTED (with specific issues)
 
-// Code Quality Review
-Task(
-  agent="code-reviewer",
-  prompt="CODE QUALITY REVIEW
-
+**Reviewer 3 — Code Quality**
+Agent persona: Code reviewer
 Review the implementation for:
 1. Code organization and structure
 2. Design patterns and best practices
@@ -351,10 +316,7 @@ Review the implementation for:
 4. Test coverage adequacy
 5. Maintainability and readability
 
-Verdict: APPROVE (high quality) or REJECTED (with specific issues)"
-)
-\`\`\`
-
+Verdict: APPROVE (high quality) or REJECTED (with specific issues)
 ### Fix and Re-verify Loop
 
 If any reviewer rejects:
@@ -458,19 +420,21 @@ ${getExpansionPrompt(context.idea, specPath, context.openQuestionsPath)}
 
 ### Part 2: Consensus Planning
 
-After the spec is created at \`${specPath}\`, invoke the RALPLAN consensus workflow:
+After the spec is created at \`${specPath}\`, invoke the RALPLAN consensus workflow.
 
-1. **Planner** creates initial implementation plan from the spec
-2. **Architect** reviews for technical feasibility and design quality (SEQUENTIAL — await before Critic)
-3. **Critic** challenges assumptions and identifies gaps
-4. Iterate until consensus is reached (up to ${context.config.verification !== false ? context.config.verification.maxIterations : 100} iterations)
+**HARD RULE: Each role MUST be executed by a separately invoked agent.** Do NOT simulate multiple roles in a single response. Use the available agent-spawning mechanism (separate agents, isolated contexts, etc.) to invoke each role independently. Self-approval is strictly prohibited.
 
-${drSummary}
+**Role prompt files** (load and pass these to each spawned agent):
+- **Planner**: \`/skill:ralplan/prompts/planner.md\`
+- **Architect**: \`/skill:ralplan/prompts/architect.md\`
+- **Critic**: \`/skill:ralplan/prompts/critic.md\`
 
-Save the plan draft (with RALPLAN-DR Summary) to: \`plans/drafts/plan_draft.md\`
-Save the final approved plan to: \`${planPath}\`
+1. **Planner** → Spawn an agent with the Planner role prompt. Pass it the spec at \`${specPath}\`. It produces a plan draft at \`plans/drafts/plan_draft.md\` with RALPLAN-DR Summary.
+2. **Architect** → Spawn an agent with the Architect role prompt. It reads \`plans/drafts/plan_draft.md\` and produces \`plans/drafts/architect_review.md\` with verdict \`APPROVE\` | \`REVISION NEEDED\`.
+   **SEQUENTIAL**: Wait for Architect to complete before spawning Critic. Do NOT run in parallel.
+3. **Critic** → Spawn an agent with the Critic role prompt. It reads \`plans/drafts/plan_draft.md\` and \`plans/drafts/architect_review.md\`, produces \`plans/drafts/critic_review.md\` with verdict \`APPROVE\` | \`ITERATE\` | \`REJECT\`.
+4. **Iteration**: Any non-APPROVE Critic verdict → loop back to step 1 with feedback from Architect + Critic. Max 5 iterations.
 
-Use the \`/skill:ralplan\` skill for detailed consensus workflow instructions.
 
 ### Architect Review: SEQUENTIAL
 
@@ -543,7 +507,7 @@ Your task: Expand the idea into requirements and identify **open questions** tha
 
 ### Step 1: Requirements Analysis
 
-Spawn an Analyst subagent to extract functional and non-functional requirements.
+Spawn an agent with the **Analyst** role to extract functional and non-functional requirements.
 
 ### Step 2: Identify Open Questions
 

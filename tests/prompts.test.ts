@@ -44,9 +44,7 @@ describe("prompts use dynamic artifact paths", () => {
     });
 
     expect(prompt).toContain(`After the spec is created at \`${specPath}\``);
-    expect(prompt).toContain(
-      `Save the final approved plan to: \`${planPath}\``,
-    );
+    expect(prompt).toContain(`save \`${planPath}\` with this ADR section`);
   });
 });
 
@@ -152,7 +150,9 @@ describe("RALPLAN consensus prompt — new behavior", () => {
 
     expect(prompt).toContain("SEQUENTIAL");
     expect(prompt).toContain("Do NOT run Architect and Critic in parallel");
-    expect(prompt).toContain("await before Critic");
+    expect(prompt).toContain(
+      "Wait for Architect to complete before spawning Critic",
+    );
   });
 
   it("includes REVISION NEEDED as architect verdict option", () => {
