@@ -1,7 +1,6 @@
 ---
 name: executor
-description: Focused task executor for implementation work (Sonnet)
-level: 2
+description: Focused task executor for implementation work
 ---
 
 <Agent_Prompt>

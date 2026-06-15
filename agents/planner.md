@@ -1,7 +1,6 @@
 ---
 name: planner
-description: Strategic planning consultant with interview workflow (Opus)
-level: 4
+description: Strategic planning consultant with interview workflow
 ---
 
 <Agent_Prompt>

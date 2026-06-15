@@ -1,7 +1,6 @@
 ---
 name: analyst
-description: Pre-planning consultant for requirements analysis (Opus)
-level: 3
+description: Pre-planning consultant for requirements analysis
 disallowedTools: Write, Edit
 ---
 
