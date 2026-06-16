@@ -13,6 +13,8 @@ import {
   getAdapterById,
   getActiveAdapters,
   registerAdapters,
+  getStageMaxIterations,
+  DEFAULT_STAGE_MAX_ITERATIONS,
   syncTrackingToConfig,
   DEFAULT_PIPELINE_CONFIG,
   type PipelineConfig,
@@ -425,5 +427,46 @@ describe("syncTrackingToConfig", () => {
     tracking.pipelineConfig.planning = false;
     syncTrackingToConfig(tracking);
     expect(tracking.stages[0].status).toBe("complete");
+  });
+});
+
+// T-8: getStageMaxIterations is the single source of truth for per-stage caps.
+// The runtime turn_end check and the prompt templates both consult it; the
+// prompt can't promise "Max 5" while the runtime check allows 100.
+describe("getStageMaxIterations (T-8)", () => {
+  const baseConfig: PipelineConfig = {
+    ...DEFAULT_PIPELINE_CONFIG,
+  };
+
+  it("ralplan: returns the planning cap (100)", () => {
+    expect(getStageMaxIterations("ralplan", baseConfig)).toBe(100);
+    expect(getStageMaxIterations("ralplan", baseConfig)).toBe(
+      DEFAULT_STAGE_MAX_ITERATIONS.ralplan,
+    );
+  });
+
+  it("execution: returns the execution cap (100)", () => {
+    expect(getStageMaxIterations("execution", baseConfig)).toBe(100);
+  });
+
+  it("qa: returns 5 (was previously capped at verification.maxIterations=100)", () => {
+    // Bug fixed: QA was using the same cap as ralph (verification.maxIterations,
+    // default 100), but the QA stage's intent is "build/lint/test cycling" with
+    // a small budget. Centralizing here ensures the runtime cap can't drift.
+    expect(getStageMaxIterations("qa", baseConfig)).toBe(5);
+  });
+
+  it("ralph: reads config.verification.maxIterations", () => {
+    const config: PipelineConfig = {
+      ...baseConfig,
+      verification: { engine: "ralph", maxIterations: 25 },
+    };
+    expect(getStageMaxIterations("ralph", config)).toBe(25);
+  });
+
+  it("ralph: falls back to 100 when verification is disabled (defensive)", () => {
+    // Should not be reached in practice (stage is skipped), but the helper is total.
+    const config: PipelineConfig = { ...baseConfig, verification: false };
+    expect(getStageMaxIterations("ralph", config)).toBe(100);
   });
 });

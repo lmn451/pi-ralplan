@@ -5,6 +5,21 @@ import { nowISO } from "./utils.js";
 // ============================================================================
 
 export type PipelineStageId = "ralplan" | "execution" | "ralph" | "qa";
+
+// Per-stage max iteration caps. Single source of truth — the prompt templates
+// (which hardcode their own cap) AND the runtime turn_end check both consult
+// this helper. Keeps the two in lockstep so the prompt can't promise "Max 5"
+// while the runtime check allows 100.
+//
+// Note: QA's prompt doesn't currently embed the cap; the cap lives in
+// getStageMaxIterations. If you raise QA's cap, raise both.
+export const DEFAULT_STAGE_MAX_ITERATIONS: Record<PipelineStageId, number> = {
+  ralplan: 100,
+  execution: 100,
+  ralph: 100, // overridden at call time by config.verification.maxIterations
+  qa: 5,
+} as const;
+
 export type PipelineTerminalState = "complete" | "failed" | "cancelled";
 export type PipelinePhase = PipelineStageId | PipelineTerminalState;
 export type StageStatus =
@@ -121,6 +136,35 @@ export function getActiveAdapters(
   config: PipelineConfig,
 ): PipelineStageAdapter[] {
   return _adapters.filter((adapter) => !adapter.shouldSkip(config));
+}
+
+/**
+ * Per-stage max iteration cap. Single source of truth for both the prompt
+ * templates (which bake the cap into the prompt text) and the runtime
+ * turn_end check (which compares `currentStage.iterations` to the cap).
+ *
+ * Caps:
+ * - `ralplan` / `execution` (planning stages): 100
+ * - `qa` (build/lint/test cycling): 5
+ * - `ralph` (verification loop): reads `config.verification.maxIterations`
+ *   (default 100). Falls back to 100 if verification is disabled (the stage
+ *   shouldn't be active in that case, but the helper stays total).
+ */
+export function getStageMaxIterations(
+  stageId: PipelineStageId,
+  config: PipelineConfig,
+): number {
+  switch (stageId) {
+    case "ralplan":
+    case "execution":
+      return DEFAULT_STAGE_MAX_ITERATIONS[stageId];
+    case "qa":
+      return DEFAULT_STAGE_MAX_ITERATIONS.qa;
+    case "ralph":
+      return config.verification === false
+        ? 100
+        : (config.verification.maxIterations ?? 100);
+  }
 }
 
 // ============================================================================

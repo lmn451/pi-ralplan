@@ -16,6 +16,7 @@ import {
   getPipelineStatus,
   formatPipelineHUD,
   syncTrackingToConfig,
+  getStageMaxIterations,
   type PipelineTracking,
   type PipelineContext,
   type PipelineStageId,
@@ -1189,11 +1190,10 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
     // Check if max iterations reached before incrementing
     const currentStage =
       state.pipeline.stages[state.pipeline.currentStageIndex];
-    const maxIters =
-      state.pipeline.pipelineConfig.verification &&
-      typeof state.pipeline.pipelineConfig.verification === "object"
-        ? (state.pipeline.pipelineConfig.verification.maxIterations ?? 100)
-        : 100;
+    const maxIters = getStageMaxIterations(
+      currentStage.id,
+      state.pipeline.pipelineConfig,
+    );
     if (currentStage.iterations >= maxIters) {
       ctx.ui.notify(
         `Maximum iterations (${maxIters}) reached for ${currentStage.id}. Please review and manually approve or use /ralplan:skip to proceed.`,
