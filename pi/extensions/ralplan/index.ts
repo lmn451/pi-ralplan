@@ -60,7 +60,13 @@ import {
 import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 import { resolveOpenQuestionsPath } from "./utils.js";
 
-import { createWorktreeForRalplan, cleanupWorktree } from "./worktree.js";
+import {
+  createWorktreeForRalplan,
+  cleanupWorktree,
+  getAutoCleanup,
+  setAutoCleanup,
+  resetAutoCleanupForTests,
+} from "./worktree.js";
 
 import {
   transitionSubPhase,
@@ -199,10 +205,13 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     writeRalplanStateFile(sessionCwd, state);
   }
 
-  function deactivateState(): void {
+  function deactivateState(options?: { suppressCleanup?: boolean }): void {
     if (state) {
-      // Best-effort worktree cleanup — warn but don't block deactivation
-      if (state.worktreePath) {
+      // Best-effort worktree cleanup — only when autoCleanup is on AND the
+      // caller hasn't explicitly suppressed cleanup (e.g. /ralplan:cancel).
+      // Default behavior: preserve the worktree so accidental completion
+      // doesn't destroy user work; cancel always preserves.
+      if (state.worktreePath && getAutoCleanup() && !options?.suppressCleanup) {
         try {
           const result = cleanupWorktree(state.worktreePath);
           if (!result.success) {
@@ -220,6 +229,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     }
     state = null;
     clearRalplanStateFile(sessionCwd);
+    // Reset the module-level flag so a subsequent session in the same
+    // process doesn't inherit this one's autoCleanup setting.
+    resetAutoCleanupForTests();
   }
 
   function updateUI(ctx: ExtensionContext): void {
@@ -316,6 +328,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     options: { notifyWorktreeFailure?: boolean } = {},
   ): PipelineTracking {
     const config = resolvePipelineConfig();
+    // Honor PipelineConfig.autoCleanup — propagate to the module-level flag
+    // that deactivateState() consults. Default false preserves the worktree
+    // on completion; users can opt in via their pipeline config.
+    setAutoCleanup(!!config.autoCleanup);
     const tracking = buildPipelineTracking(config);
 
     if (
@@ -475,7 +491,8 @@ ${prompt}`,
       );
       if (!ok) return;
 
-      deactivateState();
+      // Cancel must always preserve the worktree (user might want to resume manually)
+      deactivateState({ suppressCleanup: true });
       updateUI(ctx);
       ctx.ui.notify("RALPLAN cancelled.", "info");
     },

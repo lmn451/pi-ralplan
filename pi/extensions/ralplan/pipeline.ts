@@ -33,6 +33,13 @@ export interface PipelineConfig {
   execution: ExecutionBackend;
   verification: VerificationConfig | false;
   qa: boolean;
+  /**
+   * If true, `git worktree remove` runs automatically when the pipeline
+   * completes (deactivateState). Default: false — the worktree is preserved
+   * on completion. /ralplan:cancel always preserves the worktree regardless
+   * of this flag (uses suppressCleanup at the call site).
+   */
+  autoCleanup?: boolean;
 }
 
 export const DEFAULT_PIPELINE_CONFIG: PipelineConfig = {

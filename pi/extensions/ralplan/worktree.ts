@@ -12,6 +12,23 @@ import { resolveWorktreeRoot } from "./utils.js";
 export const DEFAULT_BASE_BRANCH = "main";
 export const DEFAULT_CREATE_BRANCH = true;
 export const DEFAULT_AUTO_CLEANUP = false;
+// Module-level autoCleanup flag. When true, deactivateState() will run
+// `git worktree remove` after pipeline completion. Defaults to false to
+// preserve user work on accidental completion. The flag is read at cleanup
+// time, so toggling it via setAutoCleanup() takes effect immediately.
+let _autoCleanup = DEFAULT_AUTO_CLEANUP;
+
+export function setAutoCleanup(value: boolean): void {
+  _autoCleanup = value;
+}
+
+export function getAutoCleanup(): boolean {
+  return _autoCleanup;
+}
+
+export function resetAutoCleanupForTests(): void {
+  _autoCleanup = DEFAULT_AUTO_CLEANUP;
+}
 
 export interface WorktreeConfig {
   baseBranch: string;
