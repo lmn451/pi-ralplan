@@ -29,7 +29,8 @@
       "./pi/extensions/ralplan"
     ],
     "skills": [
-      "./pi/skills/ralplan"
+      "./pi/skills/ralplan",
+      "./pi/skills/deep-interview"
     ]
   },
   "scripts": {
