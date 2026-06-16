@@ -94,6 +94,86 @@ describe("RALPLAN-DR summary template", () => {
     expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
   });
 
+  // Word-boundary regression tests for short signals (T-2 / T-3):
+  // substring matching caused false positives (charm → rm, author → auth).
+  it("does NOT trigger DELIBERATE for 'charm' (no 'rm' word)", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "add a lucky charm to the dashboard",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("SHORT (default)");
+    expect(prompt).not.toContain("Pre-Mortem");
+  });
+
+  it("does NOT trigger DELIBERATE for 'alarm' (no 'rm' word)", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "configure the morning alarm clock",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("SHORT (default)");
+  });
+
+  it("does NOT trigger DELIBERATE for 'format' (no 'rm' word)", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "format the date as ISO",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("SHORT (default)");
+  });
+
+  it("does NOT trigger DELIBERATE for 'author' (auth prefix only, not author)", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "add the author bio to the article page",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("SHORT (default)");
+  });
+
+  it("DOES trigger DELIBERATE for 'authorize' (auth prefix)", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "authorize users via OAuth",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
+  });
+
+  it("DOES trigger DELIBERATE for 'rm' as a standalone word (file deletion)", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "rm the old build artifacts",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
+  });
+
+  it("DOES trigger DELIBERATE for 'remove' (newly added signal)", () => {
+    const prompt = getRalplanDRSummaryTemplate({
+      idea: "remove the deprecated API endpoint",
+      directory: "/tmp/worktree",
+      cwd: "/tmp/worktree",
+      config: buildPipelineTracking(DEFAULT_PIPELINE_CONFIG).pipelineConfig,
+      mode: "ralplan",
+    });
+    expect(prompt).toContain("DELIBERATE (high-risk signals detected)");
+  });
+
   it("defaults to SHORT mode for simple ideas", () => {
     const prompt = getRalplanDRSummaryTemplate({
       idea: "add dark mode toggle",

@@ -333,8 +333,9 @@ Signal: ${RALPH_COMPLETION_SIGNAL}`;
 
 /** RALPLAN-DR summary format for the Planner to generate */
 export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
+  // Signals whose matching must be word-boundary (substrings cause false positives:
+  // "rm" matched "format"/"charm"/"alarm"; "auth" matched "author"/"authentic".)
   const deliberateSignals = [
-    "auth",
     "security",
     "credential",
     "secret",
@@ -346,7 +347,16 @@ export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
     "production",
     "destroy",
     "delete",
-    "rm",
+    "rm", // word-boundary checked below
+    "remove", // long token, substring match is safe
+    // "auth" alone is too ambiguous (matches "author"/"authentic"). Use the
+    // unambiguous long forms for substring matching. "auth" as a standalone
+    // word is intentionally NOT a signal.
+    "authentication",
+    "authorization",
+    "authorized",
+    "authorize",
+    "authorizing",
     "compliance",
     "PII",
     "GDPR",
@@ -355,7 +365,18 @@ export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
     "breaking change",
   ];
   const idea = context.idea.toLowerCase();
-  const isDeliberate = deliberateSignals.some((s) => idea.includes(s));
+  // Substring matching causes false positives for short signals
+  // (charm/alarm → rm; thermostat → ?). Use word-boundary regex for short
+  // signals (<=4 chars); keep substring matching for longer phrases that are
+  // already unambiguous (e.g. "breaking change", "public API", "authentication").
+  const SHORT_SIGNALS = new Set(["rm"]);
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const isDeliberate = deliberateSignals.some((s) => {
+    if (SHORT_SIGNALS.has(s)) {
+      return new RegExp(`\\b${escapeRegex(s)}\\b`).test(idea);
+    }
+    return idea.includes(s);
+  });
 
   return `
 ### RALPLAN-DR Summary (REQUIRED — generate before Architect review)
