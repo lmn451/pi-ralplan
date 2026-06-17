@@ -34,6 +34,7 @@ import {
   writeRalplanStateFile,
   clearRalplanStateFile,
   buildDefaultState,
+  isPersistedState,
   type RalplanState,
   type RalplanMode,
 } from "./state.js";
@@ -280,12 +281,19 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   function reconstructFromSession(ctx: ExtensionContext): void {
     const entries = ctx.sessionManager.getEntries();
 
-    // Find the most recent ralplan-state entry
+    // Find the most recent ralplan-state entry. The .data cast is
+    // intentional — session entries are JSON-deserialized into a discriminated
+    // union and the customType is checked first, so this is a structural
+    // assertion for isPersistedState to validate.
     const ralplanEntry = entries
       .filter((e) => e.type === "custom" && e.customType === CUSTOM_TYPE)
-      .pop() as { data?: PersistedState } | undefined;
+      .pop() as { data?: unknown } | undefined;
 
-    if (ralplanEntry?.data) {
+    // Validate the entry before reading fields — session data is
+    // JSON-deserialized and asserted as PersistedState, but the actual value
+    // may be malformed (corrupted session log, older extension version, etc).
+    // Fall through to file-based state instead of crashing the extension.
+    if (ralplanEntry && isPersistedState(ralplanEntry.data)) {
       const data = ralplanEntry.data;
       const status = getPipelineStatus(data.tracking);
       state = {
