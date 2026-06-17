@@ -230,9 +230,6 @@ export const executionAdapter: PipelineStageAdapter = {
     );
     if (result.success && result.path) {
       context.worktreePath = result.path;
-      console.log(
-        `[ralplan] Worktree created at execution entry: ${result.path}`,
-      );
     } else {
       console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
     }

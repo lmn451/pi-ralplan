@@ -218,7 +218,6 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
           if (!result.success) {
             console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
           } else {
-            console.log(`[ralplan] Worktree cleaned up: ${state.worktreePath}`);
           }
         } catch {
           // cleanup not available or already removed
@@ -354,8 +353,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     // Create worktree (guards against double-creation in executionAdapter.onEnter)
     const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
     if (worktreeResult.success && worktreeResult.path) {
-      console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+      // Inform the user on the TUI (not stdout) that the worktree was created.
+      ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
     } else {
+      // Real error — keep console.warn for developers, plus TUI notification.
       console.warn(
         `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
       );
