@@ -25,26 +25,15 @@ import {
   generateSpecFilename,
 } from "./naming.js";
 import { createWorktreeForRalplan } from "./worktree.js";
-import { resolveWorktreeRoot } from "./utils.js";
+import { resolveWorktreeRoot, deriveWorktreeName } from "./utils.js";
 
 export { RALPLAN_COMPLETION_SIGNAL };
 export { EXECUTION_COMPLETION_SIGNAL };
 export { RALPH_COMPLETION_SIGNAL };
 export { QA_COMPLETION_SIGNAL };
 
-/** Generate worktree name from idea */
-export function generateWorktreeName(idea: string): string {
-  // Sanitize and truncate for worktree name
-  const sanitized = idea
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
-  return sanitized || "plan";
-}
-
 export function getWorktreeCreationSection(context: PipelineContext): string {
-  const worktreeName = generateWorktreeName(context.idea);
+  const worktreeName = deriveWorktreeName(context.idea);
   const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
   const worktreePath = join(worktreeRoot, worktreeName);
 

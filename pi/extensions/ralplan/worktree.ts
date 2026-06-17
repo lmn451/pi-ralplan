@@ -6,7 +6,7 @@ import { execFileSync } from "child_process";
 import { resolve, join } from "node:path";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname } from "node:path";
-import { resolveWorktreeRoot } from "./utils.js";
+import { resolveWorktreeRoot, deriveWorktreeName } from "./utils.js";
 
 // Default worktree settings
 export const DEFAULT_BASE_BRANCH = "main";
@@ -274,13 +274,8 @@ export function createWorktreeForRalplan(
   directory: string,
   idea: string,
 ): WorktreeResult {
-  // Generate worktree name (same logic as everywhere else)
-  const worktreeName =
-    idea
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 40) || "plan";
+  // Generate worktree name (single source of truth in utils.ts)
+  const worktreeName = deriveWorktreeName(idea);
 
   // Get base branch and worktree root
   const baseBranch = detectDefaultBranch(directory);
