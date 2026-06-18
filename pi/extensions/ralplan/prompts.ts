@@ -369,10 +369,10 @@ export function getRalplanDRSummaryTemplate(context: PipelineContext): string {
   // (charm/alarm → rm; thermostat → ?). Use word-boundary regex for short
   // signals (<=4 chars); keep substring matching for longer phrases that are
   // already unambiguous (e.g. "breaking change", "public API", "authentication").
-  const SHORT_SIGNALS = new Set(["rm"]);
+  const WORD_BOUNDARY_SIGNALS = new Set(["rm"]);
   const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const isDeliberate = deliberateSignals.some((s) => {
-    if (SHORT_SIGNALS.has(s)) {
+    if (WORD_BOUNDARY_SIGNALS.has(s)) {
       return new RegExp(`\\b${escapeRegex(s)}\\b`).test(idea);
     }
     return idea.includes(s);
