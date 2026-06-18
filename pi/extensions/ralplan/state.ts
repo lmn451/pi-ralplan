@@ -41,8 +41,13 @@ const CURRENT_VERSION = 3;
 export function validateRalplanState(
   parsed: Record<string, unknown>,
 ): RalplanState | null {
-  if (typeof parsed.version !== "number" || parsed.version > CURRENT_VERSION) {
-    // Future version, can't read
+  // Reject non-numbers, future versions, and anything below the migration
+  // floor (v1). v0 was never a schema; v<1 means corrupted or hand-crafted.
+  if (
+    typeof parsed.version !== "number" ||
+    parsed.version < 1 ||
+    parsed.version > CURRENT_VERSION
+  ) {
     return null;
   }
   // v1 → v2 migration
