@@ -1039,19 +1039,19 @@ ${prompt}`,
           persistState();
           updateUI(ctx);
 
-          // Defer via setTimeout to escape agent_end phase where isStreaming
-          // is still true — without this the message goes to the dead followUpQueue
-          // and only appears on the NEXT user prompt.
-          setTimeout(() => {
-            pi.sendMessage(
-              {
-                customType: "brainstorm-awaiting",
-                content: getBrainstormAwaitingPrompt(questions),
-                display: true,
-              },
-              { triggerTurn: false },
-            );
-          }, 0);
+          // Use deliverAs: "followUp" to queue the message for the next turn
+          // (after the current streaming phase completes). The previous setTimeout
+          // workaround was a defensive measure for an older pi version that didn't
+          // support this option; the current @earendil-works/pi-coding-agent routes
+          // followUp messages outside the streaming phase directly.
+          pi.sendMessage(
+            {
+              customType: "brainstorm-awaiting",
+              content: getBrainstormAwaitingPrompt(questions),
+              display: true,
+            },
+            { triggerTurn: false, deliverAs: "followUp" },
+          );
           return;
         }
 
@@ -1096,40 +1096,34 @@ ${prompt}`,
           "RALPLAN Pipeline Complete! ✓ All stages finished successfully.",
           "info",
         );
-        // Defer via setTimeout to escape agent_end phase where isStreaming
-        // is still true — without this the message goes to the dead followUpQueue
-        // and only appears on the NEXT user prompt.
-        setTimeout(() => {
-          pi.sendMessage(
-            {
-              customType: "ralplan-complete",
-              content: `## RALPLAN Pipeline Complete! ✓
+        // Use deliverAs: "followUp" — see brainstorm-awaiting above for the rationale.
+        pi.sendMessage(
+          {
+            customType: "ralplan-complete",
+            content: `## RALPLAN Pipeline Complete! ✓
 
 All stages finished successfully.`,
-              display: true,
-            },
-            { triggerTurn: false },
-          );
-        }, 0);
+            display: true,
+          },
+          { triggerTurn: false, deliverAs: "followUp" },
+        );
         deactivateState();
         updateUI(ctx);
         return;
       }
 
       if (result.phase === "failed") {
-        // Defer via setTimeout to escape agent_end phase — same fix as ralplan-complete.
-        setTimeout(() => {
-          pi.sendMessage(
-            {
-              customType: "ralplan-failed",
-              content: `## RALPLAN Pipeline Failed
+        // Use deliverAs: "followUp" — see brainstorm-awaiting above for the rationale.
+        pi.sendMessage(
+          {
+            customType: "ralplan-failed",
+            content: `## RALPLAN Pipeline Failed
 
 Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Unknown error"}`,
-              display: true,
-            },
-            { triggerTurn: false },
-          );
-        }, 0);
+            display: true,
+          },
+          { triggerTurn: false, deliverAs: "followUp" },
+        );
         deactivateState();
         updateUI(ctx);
         return;
@@ -1139,12 +1133,10 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
       if (pipelineContext && result.adapter) {
         const prompt = result.adapter.getPrompt(pipelineContext);
         const transitionText = `${getTransitionPrompt(currentId, result.adapter.id)}\n\n${prompt}`;
-        // Defer via setTimeout to escape agent_end phase where isStreaming
-        // is still true — without this the transition goes to the dead followUpQueue
-        // and the next stage never starts until the user sends a message.
-        setTimeout(() => {
-          pi.sendUserMessage(transitionText);
-        }, 0);
+        // Use deliverAs: "followUp" — the previous setTimeout was a defensive
+        // measure for an older pi version; the current one supports the option
+        // directly and routes the message outside the streaming phase.
+        pi.sendUserMessage(transitionText, { deliverAs: "followUp" });
       }
     }
   });
