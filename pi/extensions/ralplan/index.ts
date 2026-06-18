@@ -345,9 +345,11 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
       tracking.currentStageIndex >= 0 &&
       tracking.currentStageIndex < tracking.stages.length
     ) {
-      tracking.stages[tracking.currentStageIndex].status = "active";
-      tracking.stages[tracking.currentStageIndex].startedAt =
-        new Date().toISOString();
+      const currentStage = tracking.stages[tracking.currentStageIndex];
+      if (currentStage) {
+        currentStage.status = "active";
+        currentStage.startedAt = new Date().toISOString();
+      }
     }
 
     // Create worktree (guards against double-creation in executionAdapter.onEnter)
@@ -540,14 +542,21 @@ ${prompt}`,
       const context = buildContext();
       if (context && result.adapter) {
         const prompt = result.adapter.getPrompt(context);
-        pi.sendMessage(
-          {
-            customType: "ralplan-skip",
-            content: `${getTransitionPrompt(stages[currentStageIndex].id, result.adapter.id)}\n\n${prompt}`,
-            display: true,
-          },
-          { triggerTurn: true, deliverAs: "steer" },
-        );
+        const fromStage = stages[currentStageIndex]?.id;
+        if (fromStage) {
+          const transitionPrompt = getTransitionPrompt(
+            fromStage,
+            result.adapter.id,
+          );
+          pi.sendMessage(
+            {
+              customType: "ralplan-skip",
+              content: `${transitionPrompt}\n\n${prompt}`,
+              display: true,
+            },
+            { triggerTurn: true, deliverAs: "steer" },
+          );
+        }
       }
     },
   });
@@ -1181,6 +1190,7 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
     // Check if max iterations reached before incrementing
     const currentStage =
       state.pipeline.stages[state.pipeline.currentStageIndex];
+    if (!currentStage) return;
     const maxIters = getStageMaxIterations(
       currentStage.id,
       state.pipeline.pipelineConfig,

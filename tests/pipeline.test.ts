@@ -94,9 +94,9 @@ describe("buildPipelineTracking", () => {
   it("creates all active stages with default config", () => {
     const tracking = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
     expect(tracking.stages).toHaveLength(4);
-    expect(tracking.stages[0].id).toBe("ralplan");
-    expect(tracking.stages[0].status).toBe("pending");
-    expect(tracking.stages[1].status).toBe("pending");
+    expect(tracking.stages[0]!.id).toBe("ralplan");
+    expect(tracking.stages[0]!.status).toBe("pending");
+    expect(tracking.stages[1]!.status).toBe("pending");
     expect(tracking.currentStageIndex).toBe(0);
   });
 
@@ -108,10 +108,10 @@ describe("buildPipelineTracking", () => {
       qa: false,
     };
     const tracking = buildPipelineTracking(config);
-    expect(tracking.stages[0].status).toBe("skipped"); // ralplan
-    expect(tracking.stages[1].status).toBe("pending"); // execution
-    expect(tracking.stages[2].status).toBe("skipped"); // ralph
-    expect(tracking.stages[3].status).toBe("skipped"); // qa
+    expect(tracking.stages[0]!.status).toBe("skipped"); // ralplan
+    expect(tracking.stages[1]!.status).toBe("pending"); // execution
+    expect(tracking.stages[2]!.status).toBe("skipped"); // ralph
+    expect(tracking.stages[3]!.status).toBe("skipped"); // qa
     expect(tracking.currentStageIndex).toBe(1);
   });
 });
@@ -146,8 +146,8 @@ describe("advanceStage", () => {
     const result = advanceStage(tracking);
     expect(result.phase).toBe("execution");
     expect(result.adapter?.id).toBe("execution");
-    expect(tracking.stages[0].status).toBe("complete");
-    expect(tracking.stages[1].status).toBe("active");
+    expect(tracking.stages[0]!.status).toBe("complete");
+    expect(tracking.stages[1]!.status).toBe("active");
   });
 
   it("advances through all stages to complete", () => {
@@ -180,7 +180,7 @@ describe("advanceStage", () => {
 
   it("recomputes future stage statuses after mid-flight config changes", () => {
     const tracking = buildPipelineTracking(resolvePipelineConfig());
-    tracking.stages[0].status = "active";
+    tracking.stages[0]!.status = "active";
 
     const result = advanceStage(tracking);
     expect(result.phase).toBe("execution");
@@ -191,8 +191,8 @@ describe("advanceStage", () => {
 
     const result2 = advanceStage(tracking);
     expect(result2.phase).toBe("complete");
-    expect(tracking.stages[2].status).toBe("skipped");
-    expect(tracking.stages[3].status).toBe("skipped");
+    expect(tracking.stages[2]!.status).toBe("skipped");
+    expect(tracking.stages[3]!.status).toBe("skipped");
   });
 
   it("returns failed phase when adapter is missing for an active stage", () => {
@@ -217,8 +217,8 @@ describe("advanceStage", () => {
     const result = advanceStage(tracking);
     expect(result.phase).toBe("failed");
     expect(result.adapter).toBeNull();
-    expect(tracking.stages[1].status).toBe("failed");
-    expect(tracking.stages[1].error).toContain(
+    expect(tracking.stages[1]!.status).toBe("failed");
+    expect(tracking.stages[1]!.error).toContain(
       'No adapter registered for stage "execution"',
     );
   });
@@ -254,7 +254,7 @@ describe("advanceStage", () => {
       qa: false,
     };
     const tracking = buildPipelineTracking(config);
-    tracking.stages[0].status = "active";
+    tracking.stages[0]!.status = "active";
 
     const ctx: PipelineContext = {
       idea: "test",
@@ -270,13 +270,13 @@ describe("advanceStage", () => {
 
   it("marks skipped stages as skipped when explicitly skipped", () => {
     const tracking = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
-    tracking.stages[0].status = "active";
+    tracking.stages[0]!.status = "active";
 
     const result = skipCurrentStage(tracking);
 
     expect(result.phase).toBe("execution");
-    expect(tracking.stages[0].status).toBe("skipped");
-    expect(tracking.stages[1].status).toBe("active");
+    expect(tracking.stages[0]!.status).toBe("skipped");
+    expect(tracking.stages[1]!.status).toBe("active");
   });
 });
 
@@ -284,19 +284,19 @@ describe("failCurrentStage", () => {
   it("marks current stage as failed", () => {
     const tracking = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
     failCurrentStage(tracking, "something broke");
-    expect(tracking.stages[0].status).toBe("failed");
-    expect(tracking.stages[0].error).toBe("something broke");
+    expect(tracking.stages[0]!.status).toBe("failed");
+    expect(tracking.stages[0]!.error).toBe("something broke");
   });
 });
 
 describe("incrementStageIteration", () => {
   it("increments iteration counter", () => {
     const tracking = buildPipelineTracking(DEFAULT_PIPELINE_CONFIG);
-    expect(tracking.stages[0].iterations).toBe(0);
+    expect(tracking.stages[0]!.iterations).toBe(0);
     incrementStageIteration(tracking);
-    expect(tracking.stages[0].iterations).toBe(1);
+    expect(tracking.stages[0]!.iterations).toBe(1);
     incrementStageIteration(tracking);
-    expect(tracking.stages[0].iterations).toBe(2);
+    expect(tracking.stages[0]!.iterations).toBe(2);
   });
 });
 
@@ -423,10 +423,10 @@ describe("syncTrackingToConfig", () => {
 
   it("does not affect already completed stages", () => {
     const tracking = buildPipelineTracking(resolvePipelineConfig());
-    tracking.stages[0].status = "complete";
+    tracking.stages[0]!.status = "complete";
     tracking.pipelineConfig.planning = false;
     syncTrackingToConfig(tracking);
-    expect(tracking.stages[0].status).toBe("complete");
+    expect(tracking.stages[0]!.status).toBe("complete");
   });
 });
 

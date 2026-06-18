@@ -219,7 +219,7 @@ describe("skipQuestions", () => {
     const result = skipQuestions(state);
     expect(result.subPhase).toBe("planning");
     expect(result.answers).toHaveLength(1);
-    expect(result.answers[0].question).toBe("[SKIP]");
+    expect(result.answers[0]?.question).toBe("[SKIP]");
   });
 
   it("transitions from awaiting-answers to planning", () => {

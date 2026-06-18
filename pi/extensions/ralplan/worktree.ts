@@ -99,8 +99,8 @@ export function validateWorktree(path: string): boolean {
       // It's a file - read and check for gitdir: reference
       const content = readFileSync(gitDir, "utf-8");
       const match = content.match(/^gitdir:\s*(.+)$/m);
-      if (match) {
-        const gitdirPath = match[1].trim();
+      const gitdirPath = match?.[1]?.trim();
+      if (gitdirPath) {
         // Resolve relative paths from the .git file's directory
         const resolvedGitdir = resolve(dirname(gitDir), gitdirPath);
         // Note: git worktree add validates paths, so any gitdir path here
@@ -221,15 +221,15 @@ export function createWorktree(
 function parseWorktreeEntry(entry: string): string {
   const pathMatch = entry.match(/^worktree\s+(.+)$/m);
   if (!pathMatch) return "";
-  let worktreePath = pathMatch[1].trim();
+  const worktreePath = pathMatch[1]?.trim() ?? "";
   // Check if there's a gitdir reference pointing to a different location
   const gitdirMatch = entry.match(/^gitdir\s+(.+)$/m);
   if (gitdirMatch) {
-    const gitdirPath = gitdirMatch[1].trim();
+    const gitdirPath = gitdirMatch[1]?.trim() ?? "";
     // If gitdir is relative, resolve it relative to the worktree path
     if (!resolve(gitdirPath).startsWith(resolve(worktreePath))) {
       // The gitdir is in a different location, resolve it
-      worktreePath = resolve(worktreePath, gitdirPath);
+      return resolve(worktreePath, gitdirPath);
     }
   }
   return worktreePath;

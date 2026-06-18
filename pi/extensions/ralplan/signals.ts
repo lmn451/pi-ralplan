@@ -128,6 +128,7 @@ export function getLastAssistantText(
 ): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
+    if (!msg) continue;
     if (msg.role !== "assistant") continue;
     if (typeof msg.content === "string") return msg.content;
     if (Array.isArray(msg.content)) {
