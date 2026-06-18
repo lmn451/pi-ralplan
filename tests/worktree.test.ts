@@ -89,8 +89,10 @@ describe("worktree.ts", () => {
 
       // Verify detectDefaultBranch was called with symbolic-ref
       const calls = vi.mocked(execFileSync).mock.calls;
-      expect(calls[0][0]).toBe("git");
-      expect(calls[0][1]).toContain("symbolic-ref");
+      const firstCall = calls[0];
+      if (!firstCall) throw new Error("expected mock to be called");
+      expect(firstCall[0]).toBe("git");
+      expect(firstCall[1]).toContain("symbolic-ref");
     });
 
     it("should return failure when worktree creation fails", () => {

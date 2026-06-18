@@ -160,7 +160,10 @@ export function parseOpenQuestions(markdown: string): string[] {
 export function parseUserAnswer(rawText: string, questions: string[]): QandA {
   // If there's exactly one unanswered question, map to it
   if (questions.length === 1) {
-    return { question: questions[0], answer: rawText };
+    const onlyQuestion = questions[0];
+    if (onlyQuestion !== undefined) {
+      return { question: onlyQuestion, answer: rawText };
+    }
   }
   // Otherwise, store as freeform
   return { question: "[freeform]", answer: rawText };

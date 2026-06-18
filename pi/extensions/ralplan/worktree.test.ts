@@ -123,7 +123,7 @@ HEAD abc123
 branch refs/heads/main
 `;
     const pathMatch = entry.match(/^worktree\s+(.+)$/m);
-    expect(pathMatch?.[1].trim()).toBe("/path/to/worktree");
+    expect(pathMatch?.[1]?.trim()).toBe("/path/to/worktree");
   });
 
   it("should parse worktree entry with absolute gitdir reference", () => {
@@ -134,8 +134,8 @@ HEAD abc123
     const pathMatch = entry.match(/^worktree\s+(.+)$/m);
     const gitdirMatch = entry.match(/^gitdir\s+(.+)$/m);
 
-    expect(pathMatch?.[1].trim()).toBe("/path/to/worktree");
-    expect(gitdirMatch?.[1].trim()).toBe("/absolute/path/to/.git");
+    expect(pathMatch?.[1]?.trim()).toBe("/path/to/worktree");
+    expect(gitdirMatch?.[1]?.trim()).toBe("/absolute/path/to/.git");
   });
 
   it("should parse worktree entry with relative gitdir reference", () => {
@@ -146,7 +146,7 @@ HEAD abc123
     const pathMatch = entry.match(/^worktree\s+(.+)$/m);
     const gitdirMatch = entry.match(/^gitdir\s+(.+)$/m);
 
-    expect(pathMatch?.[1].trim()).toBe("/path/to/worktree");
-    expect(gitdirMatch?.[1].trim()).toBe("../common/.git");
+    expect(pathMatch?.[1]?.trim()).toBe("/path/to/worktree");
+    expect(gitdirMatch?.[1]?.trim()).toBe("../common/.git");
   });
 });
