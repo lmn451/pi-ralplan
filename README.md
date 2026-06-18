@@ -59,6 +59,29 @@ Or start Pi with the flag:
 pi --ralplan "build me a todo app"
 ```
 
+> **Auto-start is slash-only.** The pipeline auto-starts ONLY when the prompt
+> begins with `/ralplan` or `/brainstorm` (or when `--ralplan` / `--brainstorm`
+> flags are used). Bare mentions of `ralplan` or `brainstorm` in prose —
+> including action verbs like `use ralplan to plan this` or start-of-prompt
+> directives like `ralplan: build auth` — do NOT trigger auto-start. This
+> prevents the planner/architect/critic role prompts (which all mention
+> `ralplan` naturally in their role descriptions) from accidentally
+> re-triggering a fresh pipeline for each consensus round. To start a pipeline
+> from prose, prefix the prompt with `/`:
+>
+> ```
+> /ralplan build me a todo app
+> ```
+
+### Worktrees
+
+Each pipeline run creates a single Git worktree under `<repo>-worktrees/`.
+Follow-up sessions launched from inside that worktree **reuse the same
+worktree** instead of creating a sibling — one worktree per pipeline run,
+regardless of how many consensus rounds are run. This is detected via
+`git rev-parse --git-dir` vs `--git-common-dir` and works automatically; no
+configuration required.
+
 ### Commands
 
 | Command              | Description              |
@@ -128,17 +151,20 @@ Agent Loop ← Signal Detection ← Agent Response ← Stage Prompt
 
 ```
 pi/extensions/ralplan/
-├── index.ts      # Main extension entry point
-├── pipeline.ts   # Stage machine + config
-├── adapters.ts   # Stage prompt generators
-├── prompts.ts    # Prompt templates
-├── state.ts      # Session + file persistence
-├── signals.ts    # Signal detection
-├── artifacts.ts  # Plan file management
-└── utils.ts      # Helpers
+├── index.ts          # Main extension entry point
+├── pipeline.ts       # Stage machine + config
+├── adapters.ts       # Stage prompt generators
+├── prompts.ts        # Prompt templates
+├── state.ts          # Session + file persistence
+├── signals.ts        # Signal detection
+├── artifacts.ts      # Plan file management
+├── worktree.ts       # Git worktree management (with reuse rule)
+├── brainstorm.ts     # Brainstorm mode sub-phase logic
+├── naming.ts         # Filename generation helpers
+└── utils.ts          # Shared helpers
 
 pi/skills/ralplan/
-├── SKILL.md                     # Skill definition
+├── SKILL.md                      # Skill definition
 ├── prompts/
 │   ├── planner.md
 │   ├── architect.md

@@ -4,6 +4,12 @@ All notable changes to pi-ralplan are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-18
+
+### Documentation
+
+- **README updated for 0.1.7 behavior** — added a note under Usage explaining the slash-only auto-start rule (`/ralplan` and `/brainstorm` only; bare mentions and action-verb prose do NOT trigger). Added a Worktrees section explaining the reuse rule. Refreshed the architecture file listing to include `worktree.ts`, `brainstorm.ts`, and `naming.ts`.
+
 ## [0.1.7] - 2026-06-18
 
 ### Fixed
