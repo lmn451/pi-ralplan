@@ -65,6 +65,20 @@ describe("validateRalplanState (T-7)", () => {
     ).toBeNull();
   });
 
+  it("rejects version < 1 (v0, v-1) — corrupted or hand-crafted state", () => {
+    // v0 was never a real schema; v<1 means the file was hand-edited or
+    // truncated. The field-level checks would otherwise accidentally accept
+    // these as v3 because the critical fields happen to be present.
+    const v0 = { ...validV3, version: 0 };
+    const vNeg = { ...validV3, version: -1 };
+    expect(
+      validateRalplanState(v0 as unknown as Record<string, unknown>),
+    ).toBeNull();
+    expect(
+      validateRalplanState(vNeg as unknown as Record<string, unknown>),
+    ).toBeNull();
+  });
+
   it("rejects when active is not boolean", () => {
     const bad = { ...validV3, active: "yes" };
     expect(
