@@ -263,27 +263,155 @@ export function cleanupWorktree(path: string): WorktreeResult {
 }
 
 /**
- * Create a worktree for RALPLAN with the given idea.
- * This is the single entry point for all worktree creation in RALPLAN.
+
+ * Detect if `cwd` is itself inside a Git worktree. Returns the worktree's
+
+ * top-level directory (absolute path) if so, otherwise undefined.
+
  *
- * @param directory - Session cwd
- * @param idea - The plan idea
- * @returns WorktreeResult with success, path, or error
+
+ * Used to prevent worktree-of-a-worktree accumulation: when a follow-up
+
+ * round (planner → architect → critic → execution → verification) launches
+
+ * a new RALPLAN session from inside the previous round's worktree, we want
+
+ * to reuse the existing worktree rather than create a sibling one — each
+
+ * consensus round produces a new pi session, but they must share ONE
+
+ * worktree per pipeline run.
+
+ *
+
+ * Detection uses `git rev-parse --git-dir` vs `--git-common-dir`:
+
+ *   - In the main repo they match (e.g. `.git` == `.git`).
+
+ *   - In a worktree they differ: `--git-dir` points to
+
+ *     `<main>/.git/worktrees/<name>` while `--git-common-dir` points to
+
+ *     `<main>/.git`.
+
+ *
+
+ * Returns the worktree toplevel (via `--show-toplevel`) so callers get a
+
+ * canonical absolute path even if `cwd` is a subdirectory of the worktree.
+
  */
+
+export function detectCurrentWorktree(cwd: string): string | undefined {
+  try {
+    const gitDir = execFileSync(
+      "git",
+
+      ["rev-parse", "--git-dir"],
+
+      { cwd, stdio: "pipe", encoding: "utf-8" },
+    ).trim();
+
+    const commonDir = execFileSync(
+      "git",
+
+      ["rev-parse", "--git-common-dir"],
+
+      { cwd, stdio: "pipe", encoding: "utf-8" },
+    ).trim();
+
+    // Resolve relative paths (e.g. ".git") against cwd so the equality check
+
+    // works regardless of how git printed them.
+
+    const resolvedGitDir = resolve(cwd, gitDir);
+
+    const resolvedCommonDir = resolve(cwd, commonDir);
+
+    if (resolvedGitDir === resolvedCommonDir) {
+      return undefined; // not in a worktree
+    }
+
+    const toplevel = execFileSync(
+      "git",
+
+      ["rev-parse", "--show-toplevel"],
+
+      { cwd, stdio: "pipe", encoding: "utf-8" },
+    ).trim();
+
+    return toplevel || undefined;
+  } catch {
+    // Not a git repo, git unavailable, or any other git failure — treat as
+
+    // "not in a worktree" so the caller proceeds with normal creation.
+
+    return undefined;
+  }
+}
+
+/**
+
+ * Create a worktree for RALPLAN with the given idea.
+
+ * This is the single entry point for all worktree creation in RALPLAN.
+
+ *
+
+ * Reuse rule: if `directory` is itself inside an existing Git worktree, return
+
+ * that worktree's path instead of creating a sibling. This prevents
+
+ * per-round worktree accumulation when consensus rounds launch new pi
+
+ * sessions from inside the previous round's worktree (planner → architect →
+
+ * critic → execution → verification).
+
+ *
+
+ * @param directory - Session cwd
+
+ * @param idea - The plan idea
+
+ * @returns WorktreeResult with success, path, or error
+
+ */
+
 export function createWorktreeForRalplan(
   directory: string,
+
   idea: string,
 ): WorktreeResult {
+  // If we're already inside a worktree, reuse it. Validates that the existing
+
+  // worktree's `.git` reference still resolves — a stale worktree (deleted
+
+  // common .git directory) must fall through to normal creation rather than
+
+  // silently returning a dead path.
+
+  const existing = detectCurrentWorktree(directory);
+
+  if (existing && validateWorktree(existing)) {
+    return { success: true, path: existing };
+  }
+
   // Generate worktree name (single source of truth in utils.ts)
+
   const worktreeName = deriveWorktreeName(idea);
 
   // Get base branch and worktree root
+
   const baseBranch = detectDefaultBranch(directory);
+
   const worktreeRoot = resolveWorktreeRoot(directory);
 
   const worktreeConfig: WorktreeConfig = {
     baseBranch,
+
     worktreeRoot,
+
     createBranch: true,
   };
 

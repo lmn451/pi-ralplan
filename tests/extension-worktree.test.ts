@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-  realpathSync,
-} from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chdir, cwd } from "node:process";
@@ -74,11 +68,11 @@ describe("ralplan extension worktree behavior", () => {
         ctx,
       );
 
+      const { realpathSync } = await import("node:fs");
       const savedPath = realpathSync(result.details.path as string);
       const worktreePath = realpathSync(
         join(dir, "repo-worktrees", "demo-feature"),
       );
-
       expect(savedPath.startsWith(`${worktreePath}/`)).toBe(true);
     } finally {
       chdir(prev);
@@ -173,6 +167,67 @@ describe("ralplan extension worktree behavior", () => {
       // Cancel — worktree must survive even though autoCleanup is true
       await commands.get("ralplan:cancel").handler("", ctx);
       expect(existsSync(worktreePath)).toBe(true);
+    } finally {
+      chdir(prev);
+      resetAutoCleanupForTests();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // T-NEW: When a follow-up consensus round launches a new RALPLAN session
+  // from inside the existing worktree, createWorktreeForRalplan must REUSE
+  // the current worktree instead of creating a sibling. This prevents the
+  // per-round worktree accumulation seen in practice (one worktree per
+  // planner/architect/critic review session, all stuck at the same commit).
+  it("reuses the existing worktree when /ralplan runs from inside one", async () => {
+    const { setAutoCleanup, resetAutoCleanupForTests } =
+      await import("../pi/extensions/ralplan/worktree.js");
+    const { existsSync, readdirSync } = await import("node:fs");
+    setAutoCleanup(false); // safety: never delete the worktree under test
+
+    const dir = mkdtempSync(join(tmpdir(), "ralplan-reuse-worktree-"));
+    const repo = join(dir, "repo");
+    mkdirSync(repo, { recursive: true });
+    const prev = cwd();
+
+    try {
+      chdir(repo);
+      execSync("git init -b main", { stdio: "pipe" });
+      execSync("git config user.email test@example.com", { stdio: "pipe" });
+      execSync("git config user.name test", { stdio: "pipe" });
+      writeFileSync("README.md", "x\n", "utf-8");
+      execSync("git add -f README.md && git commit -m init", {
+        stdio: "pipe",
+        shell: "/bin/bash",
+      });
+
+      // Round 1: create the original worktree via /ralplan.
+      const { pi, commands } = createStubPi();
+      ralplanExtension(pi as never);
+      const ctx = {
+        ui: {
+          notify() {},
+          setStatus() {},
+          setWidget() {},
+          theme: { fg: (_: string, text: string) => text },
+        },
+      };
+      await commands.get("ralplan").handler("demo feature", ctx);
+      const worktreesDir = join(dir, "repo-worktrees");
+      const originalWorktree = join(worktreesDir, "demo-feature");
+      expect(existsSync(originalWorktree)).toBe(true);
+      expect(readdirSync(worktreesDir)).toEqual(["demo-feature"]);
+
+      // Round 2: launch another /ralplan session FROM INSIDE the worktree.
+      // The reuse rule must return the existing worktree instead of
+      // creating "demo-feature-2" or a fresh feature branch.
+      chdir(originalWorktree);
+      const { pi: pi2, commands: cmds2 } = createStubPi();
+      ralplanExtension(pi2 as never);
+      await cmds2.get("ralplan").handler("architect review", ctx);
+
+      // The worktree directory must NOT have grown — still one entry.
+      expect(readdirSync(worktreesDir)).toEqual(["demo-feature"]);
     } finally {
       chdir(prev);
       resetAutoCleanupForTests();

@@ -4,6 +4,14 @@ All notable changes to pi-ralplan are documented here. The format is based on [K
 
 ## [Unreleased]
 
+### Fixed
+
+- **Worktree accumulation per consensus round** — each follow-up round (planner → architect → critic → execution → verification) is a separate pi session, and each one used to create its own sibling worktree. After several rounds you ended up with a dozen worktrees all checked out at the same commit. Now `createWorktreeForRalplan` detects when the session is already inside a Git worktree and reuses it instead of creating another one. One worktree per pipeline run, period. Detection uses `git rev-parse --git-dir` vs `--git-common-dir` and validates the existing worktree's `.git` reference still resolves before returning it.
+
+### Added
+
+- **`detectCurrentWorktree(cwd)`** in `worktree.ts` — pure helper that returns the worktree toplevel if `cwd` is inside one, otherwise undefined. Exported for testability and reuse.
+
 ## [0.1.5] - 2026-06-18
 
 ### Removed
