@@ -8,6 +8,7 @@ import {
   resolveStatePath,
   ensureRalplanDir,
   nowISO,
+  deriveWorktreeName,
 } from "../pi/extensions/ralplan/utils.js";
 
 // Mock fs module
@@ -143,5 +144,44 @@ describe("nowISO", () => {
     // The result should be within 10 seconds of current time
     expect(Math.abs(resultMs - before)).toBeLessThan(10000);
     expect(Math.abs(resultMs - after)).toBeLessThan(10000);
+  });
+});
+
+describe("deriveWorktreeName (single source of truth)", () => {
+  it("lowercases the idea", () => {
+    expect(deriveWorktreeName("My Test Plan")).toBe("my-test-plan");
+  });
+
+  it("replaces non-alphanumeric runs with single hyphens", () => {
+    expect(deriveWorktreeName("hello   world!!! test")).toBe(
+      "hello-world-test",
+    );
+  });
+
+  it("strips special characters", () => {
+    expect(deriveWorktreeName("Plan #1: Build API!")).toBe("plan-1-build-api");
+  });
+
+  it("strips leading and trailing whitespace and hyphens", () => {
+    expect(deriveWorktreeName("  ---hello---  ")).toBe("hello");
+  });
+
+  it("truncates to 40 chars", () => {
+    const long = "a".repeat(100);
+    expect(deriveWorktreeName(long)).toHaveLength(40);
+  });
+
+  it("falls back to 'plan' for empty / non-alphanumeric input", () => {
+    expect(deriveWorktreeName("")).toBe("plan");
+    expect(deriveWorktreeName("!!!")).toBe("plan");
+    expect(deriveWorktreeName("---")).toBe("plan");
+  });
+
+  it("matches the result format used by both adapters.ts and worktree.ts", () => {
+    // This test exists to catch drift if the helper is later duplicated.
+    // Both call sites must produce the same name for the same input.
+    const idea = "Implement OAuth2 Login Flow";
+    const expected = "implement-oauth2-login-flow";
+    expect(deriveWorktreeName(idea)).toBe(expected);
   });
 });

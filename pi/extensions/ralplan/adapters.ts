@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { getStageMaxIterations } from "./pipeline.js";
 import type {
   PipelineStageAdapter,
   PipelineConfig,
@@ -24,26 +25,15 @@ import {
   generateSpecFilename,
 } from "./naming.js";
 import { createWorktreeForRalplan } from "./worktree.js";
-import { resolveWorktreeRoot } from "./utils.js";
+import { resolveWorktreeRoot, deriveWorktreeName } from "./utils.js";
 
 export { RALPLAN_COMPLETION_SIGNAL };
 export { EXECUTION_COMPLETION_SIGNAL };
 export { RALPH_COMPLETION_SIGNAL };
 export { QA_COMPLETION_SIGNAL };
 
-/** Generate worktree name from idea */
-export function generateWorktreeName(idea: string): string {
-  // Sanitize and truncate for worktree name
-  const sanitized = idea
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
-  return sanitized || "plan";
-}
-
 export function getWorktreeCreationSection(context: PipelineContext): string {
-  const worktreeName = generateWorktreeName(context.idea);
+  const worktreeName = deriveWorktreeName(context.idea);
   const worktreeRoot = resolveWorktreeRoot(context.directory || ".");
   const worktreePath = join(worktreeRoot, worktreeName);
 
@@ -192,9 +182,7 @@ Read the spec or create one at \`${specPath}\`
 ${getDirectPlanningPrompt(
   specPath,
   planPath,
-  context.config.verification !== false
-    ? context.config.verification.maxIterations
-    : 100,
+  getStageMaxIterations("ralplan", context.config),
 )}
 
 Save the plan to: \`${planPath}\`
@@ -242,9 +230,6 @@ export const executionAdapter: PipelineStageAdapter = {
     );
     if (result.success && result.path) {
       context.worktreePath = result.path;
-      console.log(
-        `[ralplan] Worktree created at execution entry: ${result.path}`,
-      );
     } else {
       console.warn(`[ralplan] Worktree creation failed: ${result.error}`);
     }
@@ -274,10 +259,7 @@ export const ralphAdapter: PipelineStageAdapter = {
 
   getPrompt(context: PipelineContext): string {
     const specPath = context.specPath || "plans/spec.md";
-    const maxIterations =
-      context.config.verification !== false
-        ? context.config.verification.maxIterations
-        : 100;
+    const maxIterations = getStageMaxIterations("ralph", context.config);
     const cwdNote =
       context.cwd !== context.directory
         ? `\n\n**Working Directory:** All verification MUST happen in \`${context.cwd}\`.\n`

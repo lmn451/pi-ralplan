@@ -125,4 +125,58 @@ describe("ralplan extension worktree behavior", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // T-9: /ralplan:cancel must always preserve the worktree (user might want
+  // to resume manually). It must NOT clean up even if autoCleanup is on.
+  it("preserves the worktree on /ralplan:cancel even when autoCleanup is true", async () => {
+    const { setAutoCleanup, resetAutoCleanupForTests } =
+      await import("../pi/extensions/ralplan/worktree.js");
+    const { existsSync } = await import("node:fs");
+    setAutoCleanup(true);
+
+    const dir = mkdtempSync(join(tmpdir(), "ralplan-cancel-preserves-"));
+    const repo = join(dir, "repo");
+    mkdirSync(repo, { recursive: true });
+    const prev = cwd();
+
+    try {
+      chdir(repo);
+      execSync("git init -b main", { stdio: "pipe" });
+      execSync("git config user.email test@example.com", { stdio: "pipe" });
+      execSync("git config user.name test", { stdio: "pipe" });
+      writeFileSync("README.md", "x\n", "utf-8");
+      execSync("git add -f README.md && git commit -m init", {
+        stdio: "pipe",
+        shell: "/bin/bash",
+      });
+
+      const { pi, commands } = createStubPi();
+      ralplanExtension(pi as never);
+      const ctx = {
+        ui: {
+          notify() {},
+          setStatus() {},
+          setWidget() {},
+          theme: { fg: (_: string, text: string) => text },
+          // confirm() returns true to proceed with cancel
+          async confirm() {
+            return true;
+          },
+        },
+      };
+
+      // Start a session
+      await commands.get("ralplan").handler("demo feature", ctx);
+      const worktreePath = join(dir, "repo-worktrees", "demo-feature");
+      expect(existsSync(worktreePath)).toBe(true);
+
+      // Cancel — worktree must survive even though autoCleanup is true
+      await commands.get("ralplan:cancel").handler("", ctx);
+      expect(existsSync(worktreePath)).toBe(true);
+    } finally {
+      chdir(prev);
+      resetAutoCleanupForTests();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

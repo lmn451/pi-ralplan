@@ -16,6 +16,7 @@ import {
   getPipelineStatus,
   formatPipelineHUD,
   syncTrackingToConfig,
+  getStageMaxIterations,
   type PipelineTracking,
   type PipelineContext,
   type PipelineStageId,
@@ -33,6 +34,7 @@ import {
   writeRalplanStateFile,
   clearRalplanStateFile,
   buildDefaultState,
+  isPersistedState,
   type RalplanState,
   type RalplanMode,
 } from "./state.js";
@@ -57,10 +59,15 @@ import {
   writeArtifact,
 } from "./artifacts.js";
 
-import { hasBypassPrefix, looksLikeBroadRequest } from "./gate.js";
 import { resolveOpenQuestionsPath } from "./utils.js";
 
-import { createWorktreeForRalplan, cleanupWorktree } from "./worktree.js";
+import {
+  createWorktreeForRalplan,
+  cleanupWorktree,
+  getAutoCleanup,
+  setAutoCleanup,
+  resetAutoCleanupForTests,
+} from "./worktree.js";
 
 import {
   transitionSubPhase,
@@ -199,16 +206,18 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     writeRalplanStateFile(sessionCwd, state);
   }
 
-  function deactivateState(): void {
+  function deactivateState(options?: { suppressCleanup?: boolean }): void {
     if (state) {
-      // Best-effort worktree cleanup — warn but don't block deactivation
-      if (state.worktreePath) {
+      // Best-effort worktree cleanup — only when autoCleanup is on AND the
+      // caller hasn't explicitly suppressed cleanup (e.g. /ralplan:cancel).
+      // Default behavior: preserve the worktree so accidental completion
+      // doesn't destroy user work; cancel always preserves.
+      if (state.worktreePath && getAutoCleanup() && !options?.suppressCleanup) {
         try {
           const result = cleanupWorktree(state.worktreePath);
           if (!result.success) {
             console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
           } else {
-            console.log(`[ralplan] Worktree cleaned up: ${state.worktreePath}`);
           }
         } catch {
           // cleanup not available or already removed
@@ -220,6 +229,9 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     }
     state = null;
     clearRalplanStateFile(sessionCwd);
+    // Reset the module-level flag so a subsequent session in the same
+    // process doesn't inherit this one's autoCleanup setting.
+    resetAutoCleanupForTests();
   }
 
   function updateUI(ctx: ExtensionContext): void {
@@ -267,12 +279,19 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
   function reconstructFromSession(ctx: ExtensionContext): void {
     const entries = ctx.sessionManager.getEntries();
 
-    // Find the most recent ralplan-state entry
+    // Find the most recent ralplan-state entry. The .data cast is
+    // intentional — session entries are JSON-deserialized into a discriminated
+    // union and the customType is checked first, so this is a structural
+    // assertion for isPersistedState to validate.
     const ralplanEntry = entries
       .filter((e) => e.type === "custom" && e.customType === CUSTOM_TYPE)
-      .pop() as { data?: PersistedState } | undefined;
+      .pop() as { data?: unknown } | undefined;
 
-    if (ralplanEntry?.data) {
+    // Validate the entry before reading fields — session data is
+    // JSON-deserialized and asserted as PersistedState, but the actual value
+    // may be malformed (corrupted session log, older extension version, etc).
+    // Fall through to file-based state instead of crashing the extension.
+    if (ralplanEntry && isPersistedState(ralplanEntry.data)) {
       const data = ralplanEntry.data;
       const status = getPipelineStatus(data.tracking);
       state = {
@@ -316,6 +335,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     options: { notifyWorktreeFailure?: boolean } = {},
   ): PipelineTracking {
     const config = resolvePipelineConfig();
+    // Honor PipelineConfig.autoCleanup — propagate to the module-level flag
+    // that deactivateState() consults. Default false preserves the worktree
+    // on completion; users can opt in via their pipeline config.
+    setAutoCleanup(!!config.autoCleanup);
     const tracking = buildPipelineTracking(config);
 
     if (
@@ -330,8 +353,10 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
     // Create worktree (guards against double-creation in executionAdapter.onEnter)
     const worktreeResult = createWorktreeForRalplan(sessionCwd, idea);
     if (worktreeResult.success && worktreeResult.path) {
-      console.log(`[ralplan] Worktree created: ${worktreeResult.path}`);
+      // Inform the user on the TUI (not stdout) that the worktree was created.
+      ctx.ui.notify(`Worktree created: ${worktreeResult.path}`, "info");
     } else {
+      // Real error — keep console.warn for developers, plus TUI notification.
       console.warn(
         `[ralplan] Worktree creation failed: ${worktreeResult.error}`,
       );
@@ -475,7 +500,8 @@ ${prompt}`,
       );
       if (!ok) return;
 
-      deactivateState();
+      // Cancel must always preserve the worktree (user might want to resume manually)
+      deactivateState({ suppressCleanup: true });
       updateUI(ctx);
       ctx.ui.notify("RALPLAN cancelled.", "info");
     },
@@ -840,15 +866,6 @@ ${prompt}`,
       return { action: "continue" };
     }
 
-    // Ralplan-first gate: if user makes a broad request and no active session,
-    // suggest ralplan first. Skip if explicitly bypassed.
-    if (!isActive() && looksLikeBroadRequest(text) && !hasBypassPrefix(text)) {
-      ctx.ui.notify(
-        "This looks like a broad request. Consider using /ralplan for consensus planning first, or prefix with 'force:' to bypass.",
-        "info",
-      );
-    }
-
     return { action: "continue" };
   });
 
@@ -1172,11 +1189,10 @@ Error: ${result.tracking.stages[result.tracking.currentStageIndex]?.error ?? "Un
     // Check if max iterations reached before incrementing
     const currentStage =
       state.pipeline.stages[state.pipeline.currentStageIndex];
-    const maxIters =
-      state.pipeline.pipelineConfig.verification &&
-      typeof state.pipeline.pipelineConfig.verification === "object"
-        ? (state.pipeline.pipelineConfig.verification.maxIterations ?? 100)
-        : 100;
+    const maxIters = getStageMaxIterations(
+      currentStage.id,
+      state.pipeline.pipelineConfig,
+    );
     if (currentStage.iterations >= maxIters) {
       ctx.ui.notify(
         `Maximum iterations (${maxIters}) reached for ${currentStage.id}. Please review and manually approve or use /ralplan:skip to proceed.`,

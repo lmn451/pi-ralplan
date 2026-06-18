@@ -5,11 +5,13 @@ import {
   type PipelineContext,
 } from "../pi/extensions/ralplan/pipeline.js";
 import {
-  generateWorktreeName,
   getWorktreeCreationSection,
   getDateBasedNamingSection,
 } from "../pi/extensions/ralplan/adapters.js";
-import { resolveWorktreeRoot } from "../pi/extensions/ralplan/utils.js";
+import {
+  resolveWorktreeRoot,
+  deriveWorktreeName,
+} from "../pi/extensions/ralplan/utils.js";
 
 function createMockContext(
   idea: string,
@@ -27,38 +29,36 @@ function createMockContext(
   };
 }
 
-describe("generateWorktreeName", () => {
+describe("deriveWorktreeName", () => {
   it("converts idea to lowercase slug", () => {
-    expect(generateWorktreeName("My Test Plan")).toBe("my-test-plan");
+    expect(deriveWorktreeName("My Test Plan")).toBe("my-test-plan");
   });
 
   it("replaces spaces with hyphens", () => {
-    expect(generateWorktreeName("hello world test")).toBe("hello-world-test");
+    expect(deriveWorktreeName("hello world test")).toBe("hello-world-test");
   });
 
   it("removes special characters", () => {
-    expect(generateWorktreeName("Plan #1: Build API!")).toBe(
-      "plan-1-build-api",
-    );
+    expect(deriveWorktreeName("Plan #1: Build API!")).toBe("plan-1-build-api");
   });
 
   it("trims leading and trailing hyphens", () => {
-    expect(generateWorktreeName("  leading and trailing  ")).toBe(
+    expect(deriveWorktreeName("  leading and trailing  ")).toBe(
       "leading-and-trailing",
     );
   });
 
   it("truncates to 40 characters", () => {
     const longIdea = "a".repeat(50);
-    expect(generateWorktreeName(longIdea)).toHaveLength(40);
+    expect(deriveWorktreeName(longIdea)).toHaveLength(40);
   });
 
   it("returns 'plan' for empty string", () => {
-    expect(generateWorktreeName("")).toBe("plan");
+    expect(deriveWorktreeName("")).toBe("plan");
   });
 
   it("handles mixed special characters", () => {
-    expect(generateWorktreeName("Test@#$%^&*()Plan")).toBe("test-plan");
+    expect(deriveWorktreeName("Test@#$%^&*()Plan")).toBe("test-plan");
   });
 });
 

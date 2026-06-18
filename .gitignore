@@ -5,3 +5,4 @@ plans/
 # Logs and session files
 logs/
 *.jsonl
+add-deep-interview-skill.patch
