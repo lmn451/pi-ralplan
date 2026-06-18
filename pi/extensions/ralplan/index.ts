@@ -878,44 +878,32 @@ ${prompt}`,
     return { action: "continue" };
   });
 
-  // Detect if RALPLAN skill is being used based on prompt content
+  // Detect if RALPLAN skill is being used based on prompt content.
+
+  //
+  // Detection is intentionally EXTREMELY strict: ONLY the slash-command
+  // forms /ralplan and /brainstorm auto-start a pipeline. The --ralplan /
+  // --brainstorm flags are handled separately above. Bare "ralplan" or
+  // "brainstorm" mentions — even with directive verbs like "use/start/run" —
+  // do NOT trigger, because every consensus-round role prompt
+  // (planner/architect/critic) mentions "ralplan" naturally and we must not
+  // spin up a fresh pipeline for each round.
+  //
+  // If a user wants to start a pipeline from prose they can still write
+  // "/ralplan do X" — the slash makes intent unambiguous.
   function detectRalplanSkillUsage(
     prompt: string,
   ): "ralplan" | "brainstorm" | null {
-    const lower = prompt.toLowerCase();
+    const lower = prompt.trim().toLowerCase();
+    if (!lower) return null;
 
-    // Explicit skill invocations
-    if (lower.includes("ralplan") || lower.includes("/ralplan")) {
-      // Check if it's brainstorm specifically
-      if (lower.includes("brainstorm")) return "brainstorm";
-      return "ralplan";
+    // Only slash-command form triggers auto-start.
+    if (/^\/ralplan\b/.test(lower)) {
+      // If the slash command also mentions brainstorm, route there.
+      return /\bbrainstorm\b/.test(lower) ? "brainstorm" : "ralplan";
     }
-
-    // Standalone brainstorm keyword (RALPLAN brainstorm mode)
-    if (lower.includes("brainstorm")) {
+    if (/^\/brainstorm\b/.test(lower)) {
       return "brainstorm";
-    }
-
-    // Consensus planning keywords
-    if (
-      lower.includes("consensus planning") ||
-      lower.includes("architect review") ||
-      lower.includes("critic review") ||
-      (lower.includes("planner") &&
-        lower.includes("architect") &&
-        lower.includes("critic"))
-    ) {
-      return "ralplan";
-    }
-
-    // Plan artifact paths
-    if (
-      lower.includes("plans/drafts/") ||
-      lower.includes("plans/spec") ||
-      lower.includes("plans/plan") ||
-      lower.includes("plan.md")
-    ) {
-      return "ralplan";
     }
 
     return null;

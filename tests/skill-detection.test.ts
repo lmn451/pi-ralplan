@@ -1,129 +1,138 @@
 import { describe, it, expect } from "vitest";
 
 describe("detectRalplanSkillUsage", () => {
-  // We test the logic directly since it's a private function
-  // The actual integration is tested via extension-commands.test.ts
-
+  // We test the logic directly since it's a private function. The actual
+  // integration is tested via extension-commands.test.ts. Keep this copy in
+  // lockstep with the production function in pi/extensions/ralplan/index.ts.
+  //
+  // RULE: ONLY slash-command forms (/ralplan, /brainstorm) trigger
+  // auto-start. Anything else returns null so the planner/architect/critic
+  // role prompts (which all mention "ralplan" naturally) don't spin up a
+  // fresh pipeline for each consensus round.
   function detectRalplanSkillUsage(
     prompt: string,
   ): "ralplan" | "brainstorm" | null {
-    const lower = prompt.toLowerCase();
+    const lower = prompt.trim().toLowerCase();
+    if (!lower) return null;
 
-    // Explicit skill invocations
-    if (lower.includes("ralplan") || lower.includes("/ralplan")) {
-      // Check if it's brainstorm specifically
-      if (lower.includes("brainstorm")) return "brainstorm";
-      return "ralplan";
+    if (/^\/ralplan\b/.test(lower)) {
+      return /\bbrainstorm\b/.test(lower) ? "brainstorm" : "ralplan";
     }
-
-    // Standalone brainstorm keyword (RALPLAN brainstorm mode)
-    if (lower.includes("brainstorm")) {
+    if (/^\/brainstorm\b/.test(lower)) {
       return "brainstorm";
-    }
-
-    // Consensus planning keywords
-    if (
-      lower.includes("consensus planning") ||
-      lower.includes("architect review") ||
-      lower.includes("critic review") ||
-      (lower.includes("planner") &&
-        lower.includes("architect") &&
-        lower.includes("critic"))
-    ) {
-      return "ralplan";
-    }
-
-    // Plan artifact paths
-    if (
-      lower.includes("plans/drafts/") ||
-      lower.includes("plans/spec") ||
-      lower.includes("plans/plan") ||
-      lower.includes("plan.md")
-    ) {
-      return "ralplan";
     }
 
     return null;
   }
 
-  describe("explicit skill invocations", () => {
-    it("detects 'ralplan' keyword", () => {
-      expect(detectRalplanSkillUsage("use ralplan to plan this")).toBe(
-        "ralplan",
-      );
-      expect(detectRalplanSkillUsage("RALPLAN")).toBe("ralplan");
-      expect(detectRalplanSkillUsage("Ralplan")).toBe("ralplan");
-    });
-
-    it("detects '/ralplan' command", () => {
+  describe("slash-command form (SHOULD trigger)", () => {
+    it("detects bare /ralplan", () => {
       expect(detectRalplanSkillUsage("/ralplan")).toBe("ralplan");
-      expect(detectRalplanSkillUsage("invoke /ralplan for planning")).toBe(
+    });
+
+    it("detects /ralplan with payload", () => {
+      expect(detectRalplanSkillUsage("/ralplan build me auth flow")).toBe(
+        "ralplan",
+      );
+      expect(detectRalplanSkillUsage("/ralplan: add caching")).toBe("ralplan");
+      expect(detectRalplanSkillUsage("/ralplan - do the refactor")).toBe(
         "ralplan",
       );
     });
 
-    it("detects 'brainstorm' keyword and returns brainstorm mode", () => {
-      expect(detectRalplanSkillUsage("use ralplan brainstorm")).toBe(
+    it("detects /ralplan brainstorm as brainstorm mode", () => {
+      expect(detectRalplanSkillUsage("/ralplan brainstorm")).toBe("brainstorm");
+      expect(detectRalplanSkillUsage("/ralplan brainstorm my idea")).toBe(
         "brainstorm",
       );
-      expect(detectRalplanSkillUsage("brainstorm with ralplan")).toBe(
-        "brainstorm",
-      );
-      // "brainstorm mode" alone should trigger brainstorm (implicit RALPLAN)
-      expect(detectRalplanSkillUsage("use brainstorm mode")).toBe("brainstorm");
+    });
+
+    it("detects /brainstorm", () => {
+      expect(detectRalplanSkillUsage("/brainstorm")).toBe("brainstorm");
+      expect(detectRalplanSkillUsage("/brainstorm my idea")).toBe("brainstorm");
+    });
+
+    it("is case-insensitive on the slash command", () => {
+      expect(detectRalplanSkillUsage("/RALPLAN")).toBe("ralplan");
+      expect(detectRalplanSkillUsage("/Brainstorm")).toBe("brainstorm");
     });
   });
 
-  describe("consensus planning keywords", () => {
-    it("detects 'consensus planning'", () => {
-      expect(detectRalplanSkillUsage("use consensus planning")).toBe("ralplan");
-      expect(detectRalplanSkillUsage("CONSENSUS PLANNING")).toBe("ralplan");
+  // Regression: each of these previously triggered a fresh pipeline because
+  // the bare-substring check matched on "ralplan", "architect review",
+  // "critic review", or `plans/...` path mentions inside role prompts and
+  // file references. The fix is slash-only — NONE of these may trigger.
+  describe("non-slash inputs (MUST NOT trigger)", () => {
+    it("does not trigger on bare 'ralplan' or 'RALPLAN'", () => {
+      expect(detectRalplanSkillUsage("ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("RALPLAN")).toBe(null);
+      expect(detectRalplanSkillUsage("Ralplan")).toBe(null);
     });
 
-    it("detects 'architect review'", () => {
-      expect(detectRalplanSkillUsage("need architect review")).toBe("ralplan");
+    it("does not trigger on directive phrasing without a slash", () => {
+      expect(detectRalplanSkillUsage("use ralplan to plan this")).toBe(null);
+      expect(detectRalplanSkillUsage("start ralplan for auth flow")).toBe(null);
+      expect(detectRalplanSkillUsage("run ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("begin ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("trigger ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("kickoff ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("invoke ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("apply ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("make ralplan")).toBe(null);
+      expect(detectRalplanSkillUsage("do ralplan")).toBe(null);
     });
 
-    it("detects 'critic review'", () => {
-      expect(detectRalplanSkillUsage("awaiting critic review")).toBe("ralplan");
+    it("does not trigger on start-of-prompt directive without a slash", () => {
+      expect(detectRalplanSkillUsage("ralplan: build auth flow")).toBe(null);
+      expect(detectRalplanSkillUsage("ralplan - add caching")).toBe(null);
+      expect(detectRalplanSkillUsage("ralplan do the refactor")).toBe(null);
+      expect(detectRalplanSkillUsage("brainstorm with ralplan")).toBe(null);
     });
 
-    it("detects planner + architect + critic together", () => {
-      expect(detectRalplanSkillUsage("planner and architect and critic")).toBe(
-        "ralplan",
-      );
-      expect(
-        detectRalplanSkillUsage("the planner, architect, and critic roles"),
-      ).toBe("ralplan");
+    it("does not trigger on the architect role prompt", () => {
+      const prompt =
+        "You are the Architect. Review the ralplan consensus plan and provide feedback.";
+      expect(detectRalplanSkillUsage(prompt)).toBe(null);
     });
 
-    it("does not trigger on partial role mentions", () => {
-      expect(detectRalplanSkillUsage("planner and architect only")).toBe(null);
-      expect(detectRalplanSkillUsage("just a planner")).toBe(null);
+    it("does not trigger on the critic role prompt", () => {
+      const prompt =
+        "You are the Critic. Review the ralplan-DR plan for gaps and reject weak decisions.";
+      expect(detectRalplanSkillUsage(prompt)).toBe(null);
     });
-  });
 
-  describe("plan artifact paths", () => {
-    it("detects plans/drafts/ path", () => {
+    it("does not trigger on the planner role prompt", () => {
+      const prompt =
+        "You are Planner. Your mission is to produce a ralplan consensus plan via structured consultation.";
+      expect(detectRalplanSkillUsage(prompt)).toBe(null);
+    });
+
+    it("does not trigger on 'architect review' alone", () => {
+      expect(detectRalplanSkillUsage("need architect review")).toBe(null);
+      expect(detectRalplanSkillUsage("awaiting critic review")).toBe(null);
+    });
+
+    it("does not trigger on consensus-planning phrasing alone", () => {
+      expect(detectRalplanSkillUsage("use consensus planning")).toBe(null);
+      expect(detectRalplanSkillUsage("CONSENSUS PLANNING")).toBe(null);
+    });
+
+    it("does not trigger on plan artifact path mentions", () => {
       expect(
         detectRalplanSkillUsage("look at plans/drafts/plan_draft.md"),
-      ).toBe("ralplan");
+      ).toBe(null);
+      expect(detectRalplanSkillUsage("read plans/spec.md")).toBe(null);
+      expect(detectRalplanSkillUsage("update plans/plan.md")).toBe(null);
+      expect(detectRalplanSkillUsage("the plan.md file")).toBe(null);
     });
 
-    it("detects plans/spec path", () => {
-      expect(detectRalplanSkillUsage("read plans/spec.md")).toBe("ralplan");
-    });
-
-    it("detects plans/plan path", () => {
-      expect(detectRalplanSkillUsage("update plans/plan.md")).toBe("ralplan");
-    });
-
-    it("detects plan.md", () => {
-      expect(detectRalplanSkillUsage("the plan.md file")).toBe("ralplan");
+    it("does not trigger on bare 'brainstorm' embedded mid-sentence", () => {
+      expect(detectRalplanSkillUsage("let's brainstorm about this")).toBe(null);
+      expect(detectRalplanSkillUsage("use brainstorm mode")).toBe(null);
     });
   });
 
-  describe("non-ralplan prompts", () => {
+  describe("non-ralplan prompts (regression)", () => {
     it("returns null for regular prompts", () => {
       expect(detectRalplanSkillUsage("hello world")).toBe(null);
       expect(detectRalplanSkillUsage("write a function")).toBe(null);
@@ -135,8 +144,9 @@ describe("detectRalplanSkillUsage", () => {
       expect(detectRalplanSkillUsage("plan for the weekend")).toBe(null);
     });
 
-    it("does not trigger on 'plans' without specific paths", () => {
-      expect(detectRalplanSkillUsage("make plans")).toBe(null);
+    it("returns null for empty/whitespace prompts", () => {
+      expect(detectRalplanSkillUsage("")).toBe(null);
+      expect(detectRalplanSkillUsage("   \n\t  ")).toBe(null);
     });
   });
 });

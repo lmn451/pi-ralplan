@@ -6,7 +6,7 @@ All notable changes to pi-ralplan are documented here. The format is based on [K
 
 ### Fixed
 
-- **Worktree accumulation per consensus round** — each follow-up round (planner → architect → critic → execution → verification) is a separate pi session, and each one used to create its own sibling worktree. After several rounds you ended up with a dozen worktrees all checked out at the same commit. Now `createWorktreeForRalplan` detects when the session is already inside a Git worktree and reuses it instead of creating another one. One worktree per pipeline run, period. Detection uses `git rev-parse --git-dir` vs `--git-common-dir` and validates the existing worktree's `.git` reference still resolves before returning it.
+- **Auto-detection too loose — fired on every consensus round** — `detectRalplanSkillUsage` returned `"ralplan"` for any prompt containing the substring `ralplan`, `architect review`, `critic review`, or a `plans/...` path. Because the planner/architect/critic role prompts all mention `ralplan` in their role descriptions, every round-2/3/4 input triggered a fresh pipeline session. Now ONLY the slash-command forms `/ralplan` and `/brainstorm` auto-start a pipeline. The `--ralplan` / `--brainstorm` flags are handled separately. Bare `ralplan` / `brainstorm` mentions — even with directive verbs like `use/start/run` — do NOT trigger. To start a pipeline from prose, write `/ralplan do X`; the slash makes intent unambiguous.
 
 ### Added
 
