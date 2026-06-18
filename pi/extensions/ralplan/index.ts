@@ -897,10 +897,12 @@ ${prompt}`,
     const lower = prompt.trim().toLowerCase();
     if (!lower) return null;
 
-    // Only slash-command form triggers auto-start.
+    // Strict one-to-one mapping:
+    //   /ralplan  → ralplan (NEVER routes to brainstorm even if "brainstorm"
+    //               appears in the payload — use /brainstorm for that)
+    //   /brainstorm → brainstorm
     if (/^\/ralplan\b/.test(lower)) {
-      // If the slash command also mentions brainstorm, route there.
-      return /\bbrainstorm\b/.test(lower) ? "brainstorm" : "ralplan";
+      return "ralplan";
     }
     if (/^\/brainstorm\b/.test(lower)) {
       return "brainstorm";

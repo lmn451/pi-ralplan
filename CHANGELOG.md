@@ -4,15 +4,20 @@ All notable changes to pi-ralplan are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-06-18
+
 ### Fixed
 
 - **Auto-detection too loose — fired on every consensus round** — `detectRalplanSkillUsage` returned `"ralplan"` for any prompt containing the substring `ralplan`, `architect review`, `critic review`, or a `plans/...` path. Because the planner/architect/critic role prompts all mention `ralplan` in their role descriptions, every round-2/3/4 input triggered a fresh pipeline session. Now ONLY the slash-command forms `/ralplan` and `/brainstorm` auto-start a pipeline. The `--ralplan` / `--brainstorm` flags are handled separately. Bare `ralplan` / `brainstorm` mentions — even with directive verbs like `use/start/run` — do NOT trigger. To start a pipeline from prose, write `/ralplan do X`; the slash makes intent unambiguous.
+- **`/ralplan` cross-routed to brainstorm mode** — typing `/ralplan brainstorm …` used to switch the session to brainstorm mode (because the old detection saw "brainstorm" anywhere in the prompt and overrode the slash command's mode). With the slash-only tightening, `/ralplan` is strictly ralplan and `/brainstorm` is strictly brainstorm — no cross-routing, no accidental mode flips.
 
 ### Added
 
 - **`detectCurrentWorktree(cwd)`** in `worktree.ts` — pure helper that returns the worktree toplevel if `cwd` is inside one, otherwise undefined. Exported for testability and reuse.
 
-## [0.1.5] - 2026-06-18
+### Changed
+
+- **`createWorktreeForRalplan` reuse rule** — each consensus round used to create its own sibling worktree. After several rounds this produced a dozen worktrees all checked out at the same commit. Now `createWorktreeForRalplan` detects when the session is already inside a Git worktree and reuses it instead of creating another one. One worktree per pipeline run, period. Detection uses `git rev-parse --git-dir` vs `--git-common-dir` and validates the existing worktree's `.git` reference still resolves before returning it.
 
 ### Removed
 

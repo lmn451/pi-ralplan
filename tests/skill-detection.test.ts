@@ -15,8 +15,11 @@ describe("detectRalplanSkillUsage", () => {
     const lower = prompt.trim().toLowerCase();
     if (!lower) return null;
 
+    // Strict one-to-one mapping: /ralplan → ralplan, /brainstorm → brainstorm.
+    // /ralplan brainstorm does NOT cross-route to brainstorm — users must use
+    // /brainstorm explicitly.
     if (/^\/ralplan\b/.test(lower)) {
-      return /\bbrainstorm\b/.test(lower) ? "brainstorm" : "ralplan";
+      return "ralplan";
     }
     if (/^\/brainstorm\b/.test(lower)) {
       return "brainstorm";
@@ -40,10 +43,13 @@ describe("detectRalplanSkillUsage", () => {
       );
     });
 
-    it("detects /ralplan brainstorm as brainstorm mode", () => {
-      expect(detectRalplanSkillUsage("/ralplan brainstorm")).toBe("brainstorm");
+    it("/ralplan is strictly ralplan — does NOT cross-route to brainstorm", () => {
+      // Even with 'brainstorm' in the payload, /ralplan stays in ralplan mode.
+      // Users who want brainstorm must use /brainstorm explicitly. This keeps
+      // mode-routing unambiguous.
+      expect(detectRalplanSkillUsage("/ralplan brainstorm")).toBe("ralplan");
       expect(detectRalplanSkillUsage("/ralplan brainstorm my idea")).toBe(
-        "brainstorm",
+        "ralplan",
       );
     });
 
