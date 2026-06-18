@@ -78,24 +78,24 @@ export interface PipelineContext {
    * agent's `cwd`.
    */
   cwd: string; // Explicit working directory — set to worktreePath when available, else sessionCwd
-  sessionId?: string;
-  specPath?: string;
-  planPath?: string;
-  openQuestionsPath?: string;
-  answersPath?: string;
+  sessionId?: string | undefined;
+  specPath?: string | undefined;
+  planPath?: string | undefined;
+  openQuestionsPath?: string | undefined;
+  answersPath?: string | undefined;
   config: PipelineConfig;
-  mode?: "ralplan" | "brainstorm";
-  brainstorm?: import("./brainstorm.js").BrainstormState;
-  worktreePath?: string; // Associated worktree path (set during execution entry)
+  mode?: "ralplan" | "brainstorm" | undefined;
+  brainstorm?: import("./brainstorm.js").BrainstormState | undefined;
+  worktreePath?: string | undefined; // Associated worktree path (set during execution entry)
 }
 
 export interface PipelineStageState {
   id: PipelineStageId;
   status: StageStatus;
-  startedAt?: string;
-  completedAt?: string;
+  startedAt?: string | undefined;
+  completedAt?: string | undefined;
   iterations: number;
-  error?: string;
+  error?: string | undefined;
 }
 
 export interface PipelineTracking {

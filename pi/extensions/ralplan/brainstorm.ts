@@ -15,7 +15,7 @@ export interface BrainstormState {
   subPhase: BrainstormSubPhase;
   questions: string[];
   answers: QandA[];
-  awaitingSince?: string;
+  awaitingSince?: string | undefined;
 }
 
 // ============================================================================

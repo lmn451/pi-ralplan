@@ -19,15 +19,15 @@ export interface RalplanState {
   mode: RalplanMode;
   pipeline: PipelineTracking;
   originalIdea: string;
-  specPath?: string;
-  planPath?: string;
-  answersPath?: string;
-  brainstorm?: BrainstormState;
-  sessionId?: string;
+  specPath?: string | undefined;
+  planPath?: string | undefined;
+  answersPath?: string | undefined;
+  brainstorm?: BrainstormState | undefined;
+  sessionId?: string | undefined;
   startedAt: string;
-  completedAt?: string;
-  worktreePath?: string; // Associated worktree for this plan
-  sessionCwd?: string; // Original directory where the session started (for worktree path derivation)
+  completedAt?: string | undefined;
+  worktreePath?: string | undefined; // Associated worktree for this plan
+  sessionCwd?: string | undefined; // Original directory where the session started (for worktree path derivation)
 }
 
 const CURRENT_VERSION = 3;
