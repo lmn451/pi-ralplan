@@ -95,12 +95,12 @@ interface PersistedState {
   originalIdea: string;
   specPath: string;
   planPath: string;
-  sessionId?: string;
-  mode?: RalplanMode;
-  answersPath?: string;
-  brainstorm?: BrainstormState;
-  worktreePath?: string; // NEW: Associated worktree
-  sessionCwd?: string; // NEW: Original directory at session start
+  sessionId?: string | undefined;
+  mode?: RalplanMode | undefined;
+  answersPath?: string | undefined;
+  brainstorm?: BrainstormState | undefined;
+  worktreePath?: string | undefined; // NEW: Associated worktree
+  sessionCwd?: string | undefined; // NEW: Original directory at session start
 }
 const CUSTOM_TYPE = "ralplan-state";
 
