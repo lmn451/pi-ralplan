@@ -267,6 +267,46 @@ describe("ralplan extension command handlers", () => {
         rmSync(dir, { recursive: true, force: true });
       }
     });
+
+    it("clears the progress widget when /ralplan:skip completes the pipeline", async () => {
+      // Regression: previously deactivateState() was called without updateUI(ctx)
+      // after the skip-to-complete/failed branches, leaving the HUD widget stale.
+      const dir = mkdtempSync(join(tmpdir(), "ralplan-skip-ui-"));
+      const prev = cwd();
+
+      try {
+        createTestRepo(dir);
+        const { pi, commands } = createStubPi();
+        ralplanExtension(pi as never);
+
+        const widgetCalls: Array<string | undefined> = [];
+        const ctx = {
+          ui: {
+            notify() {},
+            setStatus() {},
+            setWidget: (_k: string, v: string | string[] | undefined) =>
+              widgetCalls.push(Array.isArray(v) ? v[0] : v),
+            theme: { fg: (_: string, text: string) => text },
+          },
+        };
+
+        await commands.get("ralplan").handler("skip-ui test feature", ctx);
+        // Default config has 4 active stages (ralplan, execution, ralph, qa);
+        // skipping each one completes the pipeline.
+        for (let i = 0; i < 5; i++) {
+          await commands.get("ralplan:skip").handler("", ctx);
+        }
+
+        // The final setWidget call must clear the widget (undefined), matching
+        // the agent_end completion path. A stale HUD would leave a non-undefined
+        // string[] (the HUD lines) here.
+        const last = widgetCalls[widgetCalls.length - 1];
+        expect(last).toBeUndefined();
+      } finally {
+        chdir(prev);
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("ralplan:status", () => {
@@ -385,6 +425,75 @@ describe("ralplan extension command handlers", () => {
         // Verify status message shows brainstorm mode
         expect(notifyMessage).toContain("RALPLAN Status");
         expect(notifyMessage).toContain("Brainstorm");
+      } finally {
+        chdir(prev);
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("ralplan_set_config tool", () => {
+    it("preserves a custom verification maxIterations when re-enabling verification", async () => {
+      // Regression: previously, calling set_config with verification: "ralph"
+      // hardcoded maxIterations: 100, discarding any prior custom value.
+      const dir = mkdtempSync(join(tmpdir(), "ralplan-setconfig-"));
+      const prev = cwd();
+
+      try {
+        createTestRepo(dir);
+        const { pi, commands, tools } = createStubPi();
+        ralplanExtension(pi as never);
+
+        // Override appendEntry to capture persisted state — the shared stub
+        // leaves it as a no-op, but we need to seed a custom maxIterations
+        // between two set_config calls to exercise the re-enable path.
+        const persisted: any[] = [];
+        pi.appendEntry = ((_type: string, data: unknown) => {
+          persisted.push(data);
+        }) as typeof pi.appendEntry;
+
+        const ctx = {
+          ui: {
+            notify() {},
+            setStatus() {},
+            setWidget() {},
+            theme: { fg: (_: string, text: string) => text },
+          },
+        };
+
+        await commands.get("ralplan").handler("setconfig test feature", ctx);
+        const setConfig = tools.get("ralplan_set_config");
+        expect(setConfig).toBeDefined();
+
+        // Step 1: disable verification.
+        await setConfig.execute(
+          "call-1",
+          { verification: "skip" },
+          new AbortController().signal,
+          () => {},
+          ctx,
+        );
+
+        // Step 2: seed a custom maxIterations on the live persisted config.
+        // The extension reads prevMax from config.verification, so mutating
+        // the most recent persisted entry seeds the closure's live config.
+        const latest = persisted[persisted.length - 1];
+        latest.tracking.pipelineConfig.verification = {
+          engine: "ralph",
+          maxIterations: 42,
+        };
+
+        // Step 3: re-enable verification — should inherit 42.
+        const result = await setConfig.execute(
+          "call-2",
+          { verification: "ralph" },
+          new AbortController().signal,
+          () => {},
+          ctx,
+        );
+
+        const verification = (result.details as any)?.config?.verification;
+        expect(verification).toEqual({ engine: "ralph", maxIterations: 42 });
       } finally {
         chdir(prev);
         rmSync(dir, { recursive: true, force: true });
