@@ -315,3 +315,18 @@ describe("RALPLAN consensus prompt — new behavior", () => {
     expect(consensusPrompt).toContain("DELIBERATE mode");
   });
 });
+
+describe("expansion prompt structure", () => {
+  it("contains the Step 2.5 heading exactly once", () => {
+    // Regression: an earlier draft duplicated "### Step 2.5: Persist Open
+    // Questions", which leaked a malformed expansion section into every
+    // consensus/direct/brainstorm planning prompt.
+    const prompt = getExpansionPrompt(
+      "idea",
+      specPath,
+      "/tmp/worktree/plans/open-questions.md",
+    );
+    const matches = prompt.match(/### Step 2\.5: Persist Open Questions/g);
+    expect(matches?.length ?? 0).toBe(1);
+  });
+});

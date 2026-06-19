@@ -130,9 +130,7 @@ export function buildPipelineContext(
     sessionId: state.sessionId,
     specPath: toWorkspacePath(state.specPath),
     planPath: toWorkspacePath(state.planPath),
-    openQuestionsPath: worktreePath
-      ? resolveOpenQuestionsPath(worktreePath)
-      : "plans/open-questions.md",
+    openQuestionsPath: resolveOpenQuestionsPath(worktreePath ?? sessionCwd),
     answersPath: toWorkspacePath(state.answersPath),
     config: state.pipeline.pipelineConfig,
     mode: state.mode,
@@ -217,7 +215,6 @@ export default function ralplanExtension(pi: ExtensionAPI): void {
           const result = cleanupWorktree(state.worktreePath);
           if (!result.success) {
             console.warn(`[ralplan] Worktree cleanup failed: ${result.error}`);
-          } else {
           }
         } catch {
           // cleanup not available or already removed
@@ -527,6 +524,9 @@ ${prompt}`,
       if (result.phase === "complete") {
         ctx.ui.notify("RALPLAN pipeline complete!", "info");
         deactivateState();
+        // Clear the progress widget — matches agent_end path which calls
+        // updateUI after deactivate. Without this, the HUD stays stale.
+        updateUI(ctx);
         return;
       }
 
@@ -536,6 +536,7 @@ ${prompt}`,
           "error",
         );
         deactivateState();
+        updateUI(ctx);
         return;
       }
 
@@ -708,6 +709,7 @@ ${prompt}`,
 
       if (result.phase === "complete") {
         deactivateState();
+        updateUI(ctx);
         return {
           content: [
             {
@@ -721,6 +723,7 @@ ${prompt}`,
 
       if (result.phase === "failed") {
         deactivateState();
+        updateUI(ctx);
         return {
           content: [
             {
@@ -814,12 +817,20 @@ ${prompt}`,
       else if (params.planning) config.planning = params.planning;
 
       if (params.execution) config.execution = params.execution;
-
       if (params.verification === "skip") config.verification = false;
       else if (params.verification) {
-        config.verification = { engine: "ralph", maxIterations: 100 };
+        // Preserve existing maxIterations if verification was already configured;
+        // only fall back to 100 when there's no prior value to inherit.
+        const prevMax =
+          typeof config.verification === "object" &&
+          config.verification !== null
+            ? config.verification.maxIterations
+            : undefined;
+        config.verification = {
+          engine: "ralph",
+          maxIterations: prevMax ?? 100,
+        };
       }
-
       if (params.qa !== undefined) config.qa = params.qa;
 
       state.pipeline = syncTrackingToConfig(state.pipeline);

@@ -50,7 +50,6 @@ Based on the requirements analysis above, create:
 Output as structured markdown.
 
 ### Step 2.5: Persist Open Questions
-### Step 2.5: Persist Open Questions
 
 If the Analyst output includes a \`## Open Questions\` section, extract those items and save them to \`plans/open-questions.md\` using the standard format:
 
