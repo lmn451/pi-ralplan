@@ -527,6 +527,9 @@ ${prompt}`,
       if (result.phase === "complete") {
         ctx.ui.notify("RALPLAN pipeline complete!", "info");
         deactivateState();
+        // Clear the progress widget — matches agent_end path which calls
+        // updateUI after deactivate. Without this, the HUD stays stale.
+        updateUI(ctx);
         return;
       }
 
@@ -536,6 +539,7 @@ ${prompt}`,
           "error",
         );
         deactivateState();
+        updateUI(ctx);
         return;
       }
 
@@ -708,6 +712,7 @@ ${prompt}`,
 
       if (result.phase === "complete") {
         deactivateState();
+        updateUI(ctx);
         return {
           content: [
             {
@@ -721,6 +726,7 @@ ${prompt}`,
 
       if (result.phase === "failed") {
         deactivateState();
+        updateUI(ctx);
         return {
           content: [
             {
